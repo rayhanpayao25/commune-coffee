@@ -553,9 +553,9 @@ useEffect(() => {
                 <tr className="bg-[#b5d6d8] border-b border-neutral-400 text-neutral-800 text-xs font-semibold">
                   <th className="p-3 border-r border-neutral-300">Item Name</th>
                   <th className="p-3 border-r border-neutral-300">Category</th>
-                  <th className="p-3 border-r border-neutral-300 text-right">Remaining Stock</th>
+                  <th className="p-3 border-r border-neutral-300 text-right">Current Stock</th>
                   <th className="p-3 border-r border-neutral-300 text-right">Total Used</th>
-                  <th className="p-3 border-r border-neutral-300 text-right">Total Stock</th>
+                  <th className="p-3 border-r border-neutral-300 text-right">Remaining Stock</th>
                   <th className="p-3 border-r border-neutral-300 text-center">Restock</th>
                   <th className="p-3 text-center">Actions</th>
                 </tr>
