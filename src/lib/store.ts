@@ -25,16 +25,21 @@ function supabaseAdmin() {
     "NEXT_PUBLIC_commume_coffee_SUPABASE_URL",
   );
   const key = env(
-    "SUPABASE_SERVICE_ROLE_KEY",
     "SUPABASE_SECRET_KEY",
-    "commume_coffee_SUPABASE_SERVICE_ROLE_KEY",
     "commume_coffee_SUPABASE_SECRET_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "commume_coffee_SUPABASE_SERVICE_ROLE_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY_2",
   );
 
   if (!url || !key) {
     throw new Error(
-      "Supabase credentials are missing. In local development, create .env.local with SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY, then restart Next.js.",
+      "Supabase credentials are missing. Add the real SUPABASE_URL and SUPABASE_SECRET_KEY to .env.local, then restart Next.js.",
     );
+  }
+
+  if (!/^https:\/\/[^/]+\.supabase\.co$/.test(url)) {
+    throw new Error("SUPABASE_URL must be the full https://<project-ref>.supabase.co URL.");
   }
 
   return createClient(url, key, {
