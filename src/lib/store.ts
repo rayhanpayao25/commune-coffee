@@ -212,6 +212,19 @@ function normalizeStore(store: StoreData): StoreData {
   if (!Array.isArray(store.costings)) {
     store.costings = [];
   }
+
+  const matchaInventory = store.inventory.find((item) => /matcha/i.test(item.name));
+  const hasMatchaCosting = store.costings.some((costing) =>
+    costing.ingredients.some((ingredient) => /matcha/i.test(ingredient.name)),
+  );
+  if (matchaInventory && !hasMatchaCosting) {
+    store.costings.push({
+      id: "cost-matcha-powder",
+      productName: "Matcha Powder",
+      ingredients: [{ name: matchaInventory.name, amount: 150, unit: "grams", outputCups: 15 }],
+    });
+  }
+
   if (!Array.isArray(store.users) || store.users.length === 0) {
     store.users = DEFAULT_USERS.map((item) => ({ ...item }));
   } else {
@@ -243,7 +256,14 @@ async function readStore(): Promise<StoreData> {
     await writeStore(store);
     return store;
   }
-  return normalizeStore(data.payload as StoreData);
+
+  const original = data.payload as StoreData;
+  const store = normalizeStore(original);
+  const originalCostings = Array.isArray(original.costings) ? original.costings : [];
+  if (store.costings.length !== originalCostings.length) {
+    await writeStore(store);
+  }
+  return store;
 }
 
 async function writeStore(store: StoreData): Promise<void> {
