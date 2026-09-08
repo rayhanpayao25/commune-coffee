@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { deleteAdminRecord } from "@/actions/pos";
 import type { StoreData } from "@/lib/types";
 
 type TabType = "transactions" | "stock" | "restock" | "costing" | "used";
@@ -89,33 +90,8 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
 
   const [stocks, setStocks] = useState<StockItem[]>(persistedStocks);
 
-  const [restocks, setRestocks] = useState<RestockRecord[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("sys_restocks");
-      if (saved) return JSON.parse(saved);
-    }
-    return [
-      { id: "1", itemName: "Coffee Beans", quantityAdded: 1000, date: "2026-09-07 10:00:00" },
-    ];
-  });
-
-  const [costings, setCostings] = useState<CostingItem[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("sys_costings");
-      if (saved) return JSON.parse(saved);
-    }
-    return [
-      {
-        id: "1",
-        productName: "Iced Latte",
-        ingredients: [
-          { name: "Coffee Beans", amount: 18, unit: "grams" },
-          { name: "Milk", amount: 133, unit: "ml" },
-          { name: "Cups", amount: 1, unit: "pcs" },
-        ],
-      },
-    ];
-  });
+  const [restocks, setRestocks] = useState<RestockRecord[]>(store.restocks ?? []);
+  const [costings, setCostings] = useState<CostingItem[]>(store.costings ?? []);
 
   const [usages, setUsages] = useState<UsageRecord[]>(persistedUsages);
 
@@ -123,7 +99,9 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
     setTransactions(persistedTransactions);
     setStocks(persistedStocks);
     setUsages(persistedUsages);
-  }, [store.orders, store.inventory, store.usageLogs]);
+    setRestocks(store.restocks ?? []);
+    setCostings(store.costings ?? []);
+  }, [store.orders, store.inventory, store.usageLogs, store.restocks, store.costings]);
 
   const [editTxId, setEditTxId] = useState<string | null>(null);
   const [txProduct, setTxProduct] = useState("");
@@ -248,12 +226,11 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
     setTxDate(t.date);
   };
 
-  const handleDeleteTransaction = (id: string) => {
+  const handleDeleteTransaction = async (id: string) => {
     const tx = transactions.find((t) => t.id === id);
-    if (tx) {
-      applyTransactionInventoryEffect(tx.productName, tx.type, tx.quantity, tx.date, true);
-    }
-    setTransactions(transactions.filter((t) => t.id !== id));
+    if (tx) applyTransactionInventoryEffect(tx.productName, tx.type, tx.quantity, tx.date, true);
+    setTransactions((current) => current.filter((t) => t.id !== id));
+    await deleteAdminRecord("order", id);
   };
 
   const handleSaveStock = (e: React.FormEvent) => {
@@ -287,8 +264,9 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
     setStockQty(s.stock.toString());
   };
 
-  const handleDeleteStock = (id: string) => {
-    setStocks(stocks.filter((s) => s.id !== id));
+  const handleDeleteStock = async (id: string) => {
+    setStocks((current) => current.filter((s) => s.id !== id));
+    await deleteAdminRecord("inventory", id);
   };
 
   const handleInlineRestock = (item: StockItem) => {
@@ -338,8 +316,9 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
     setRestockDate(r.date);
   };
 
-  const handleDeleteRestock = (id: string) => {
-    setRestocks(restocks.filter((r) => r.id !== id));
+  const handleDeleteRestock = async (id: string) => {
+    setRestocks((current) => current.filter((r) => r.id !== id));
+    await deleteAdminRecord("restock", id);
   };
 
   const handleSaveCosting = (e: React.FormEvent) => {
@@ -363,8 +342,9 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
     setCostingIngs(c.ingredients);
   };
 
-  const handleDeleteCosting = (id: string) => {
-    setCostings(costings.filter((c) => c.id !== id));
+  const handleDeleteCosting = async (id: string) => {
+    setCostings((current) => current.filter((c) => c.id !== id));
+    await deleteAdminRecord("costing", id);
   };
 
   const filteredTransactions = transactions.filter((t) => {

@@ -15,6 +15,31 @@ async function requireBarista() {
   return session;
 }
 
+async function requireAdmin() {
+  const session = await getSession();
+  if (!session || session.role !== "admin") {
+    throw new Error("Only an admin can change store records.");
+  }
+}
+
+export async function deleteAdminRecord(kind: "order" | "inventory" | "restock" | "costing", id: string) {
+  await requireAdmin();
+  await updateStore((store) => {
+    if (kind === "order") {
+      store.orders = store.orders.filter((order) => order.id !== id);
+      store.usageLogs = store.usageLogs.filter((entry) => entry.orderId !== id);
+    } else if (kind === "inventory") {
+      store.inventory = store.inventory.filter((item) => item.id !== id);
+    } else if (kind === "restock") {
+      store.restocks = store.restocks.filter((record) => record.id !== id);
+    } else {
+      store.costings = store.costings.filter((record) => record.id !== id);
+    }
+  });
+  revalidatePath("/admin");
+  return { ok: true };
+}
+
 export async function openPos() {
   const session = await requireBarista();
   await updateStore((store) => {

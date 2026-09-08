@@ -131,6 +131,8 @@ function emptyStore(): StoreData {
     inventory: DEFAULT_INVENTORY.map((item) => ({ ...item })),
     recipes: structuredClone(DEFAULT_RECIPES),
     usageLogs: [],
+    restocks: [],
+    costings: [],
   };
 }
 
@@ -197,6 +199,12 @@ function normalizeStore(store: StoreData): StoreData {
   }
   if (!Array.isArray(store.usageLogs)) {
     store.usageLogs = [];
+  }
+  if (!Array.isArray(store.restocks)) {
+    store.restocks = [];
+  }
+  if (!Array.isArray(store.costings)) {
+    store.costings = [];
   }
   if (!Array.isArray(store.users) || store.users.length === 0) {
     store.users = DEFAULT_USERS.map((item) => ({ ...item }));

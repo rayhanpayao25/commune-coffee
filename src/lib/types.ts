@@ -91,6 +91,19 @@ export type UsageLog = {
   unit: string;
 };
 
+export type RestockRecord = {
+  id: string;
+  itemName: string;
+  quantityAdded: number;
+  date: string;
+};
+
+export type CostingItem = {
+  id: string;
+  productName: string;
+  ingredients: { name: string; amount: number; unit: string }[];
+};
+
 export type StoreData = {
   pos: PosState;
   orders: Order[];
@@ -101,4 +114,6 @@ export type StoreData = {
   inventory: InventoryItem[];
   recipes: Record<string, RecipeIngredient[]>;
   usageLogs: UsageLog[];
+  restocks: RestockRecord[];
+  costings: CostingItem[];
 };
