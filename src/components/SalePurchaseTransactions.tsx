@@ -500,6 +500,11 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
 
       {activeTab === "stock" && (
         <div className="space-y-6">
+          <div className="flex items-center gap-3 bg-[#d1e8e9] p-3 rounded-lg border border-neutral-400 text-sm">
+            <label className="text-xs text-neutral-600">Filter date:</label>
+            <input type="date" value={selectedDateFilter} onChange={(e) => setSelectedDateFilter(e.target.value)} className="bg-white border border-neutral-400 rounded px-2 py-1 text-xs" />
+            {selectedDateFilter && <button onClick={() => setSelectedDateFilter("")} className="text-xs text-blue-600 underline">Reset</button>}
+          </div>
           <div className="bg-[#d1e8e9] p-4 rounded-lg border border-neutral-400 space-y-4">
             <h3 className="text-xs font-bold text-neutral-700 uppercase">{editStockId ? "Edit Stock Item" : "Add Stock Item"}</h3>
             <form onSubmit={handleSaveStock} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
@@ -526,6 +531,7 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="bg-[#b5d6d8] border-b border-neutral-400 text-neutral-800 text-xs font-semibold">
+                  <th className="p-3 border-r border-neutral-300">Date</th>
                   <th className="p-3 border-r border-neutral-300">Item Name</th>
                   <th className="p-3 border-r border-neutral-300">Category</th>
                   <th className="p-3 border-r border-neutral-300 text-right">Current Stock</th>
@@ -541,7 +547,7 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                 {stocks.map((s) => {
                   const isMatcha = /matcha/i.test(`${s.name} ${s.category}`);
                   const orderUsed = isMatcha
-                    ? store.orders.reduce((sum, order) => sum + order.items
+                    ? store.orders.filter((order) => !selectedDateFilter || order.createdAt.slice(0, 10) === selectedDateFilter).reduce((sum, order) => sum + order.items
                       .filter((item) => /matcha|hojicha/i.test(`${item.name} ${item.productId}`))
                       .reduce((itemSum, item) => itemSum + item.qty * 10, 0), 0)
                     : 0;
@@ -565,6 +571,7 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
 
                   return (
                     <tr key={s.id} className="border-b border-neutral-200 text-xs">
+                      <td className="p-3 border-r border-neutral-200 text-neutral-600">{selectedDateFilter || getTodayDate()}</td>
                       <td className="p-3 border-r border-neutral-200 font-medium">{s.name}</td>
                       <td className="p-3 border-r border-neutral-200 text-neutral-600">{s.category}</td>
                       <td className="p-2 border-r border-neutral-200 text-right font-bold">
@@ -584,7 +591,7 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                         {isMatcha ? `${totalRestocked} packs` : totalRestocked}
                       </td>
                       <td className="p-3 border-r border-neutral-200 text-right font-bold">
-                        {isMatcha ? `${stockInBaseUnits.toFixed(0)} g` : stockInBaseUnits}
+                        {isMatcha ? `${totalStock} packs (${stockInBaseUnits.toFixed(0)} g)` : stockInBaseUnits}
                       </td>
                       <td className="p-2 border-r border-neutral-200 text-right text-red-600 font-medium">
                         <input
@@ -668,7 +675,7 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                 </tr>
               </thead>
               <tbody>
-                {restocks.map((r) => (
+                  {restocks.filter((r) => !selectedDateFilter || r.date.slice(0, 10) === selectedDateFilter).map((r) => (
                   <tr key={r.id} className="border-b border-neutral-200 text-xs">
                     <td className="p-3 border-r border-neutral-200 text-neutral-600 font-medium">{r.date}</td>
                     <td className="p-3 border-r border-neutral-200 font-medium">{r.itemName}</td>
@@ -740,6 +747,7 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="bg-[#b5d6d8] border-b border-neutral-400 text-neutral-800 text-xs font-semibold">
+                  <th className="p-3 border-r border-neutral-300">Date</th>
                   <th className="p-3 border-r border-neutral-300">Item</th>
                   <th className="p-3 border-r border-neutral-300">Cups</th>
                   <th className="p-3 border-r border-neutral-300">Used</th>
@@ -780,6 +788,7 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                       const cupsUsed = ing && ing.amount > 0 && ing.outputCups ? (used / ing.amount) * ing.outputCups : 0;
                       const cups = ing && ing.amount > 0 && ing.outputCups ? (available / ing.amount) * ing.outputCups : 0;
                       return <>
+                        <td className="p-3 border-r border-neutral-200 text-neutral-600">{selectedDateFilter || getTodayDate()}</td>
                         <td className="p-3 border-r border-neutral-200 font-medium">{c.productName}</td>
                         <td className="p-3 border-r border-neutral-200 font-semibold">{cupsUsed.toFixed(2)}</td>
                         <td className="p-3 border-r border-neutral-200 text-red-600">{used} {ing?.unit}</td>
