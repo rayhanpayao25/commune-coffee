@@ -9,13 +9,42 @@ const STORE_STATE_ID = "commune-coffee";
 
 let queue: Promise<unknown> = Promise.resolve();
 
-function supabaseAdmin() {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SECRET_KEY;
-  if (!url || !key) {
-    throw new Error("Supabase server credentials are not configured.");
+function env(...names: string[]) {
+  for (const name of names) {
+    const value = process.env[name]?.trim();
+    if (value) return value;
   }
-  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+  return undefined;
+}
+
+function supabaseAdmin() {
+  const url = env(
+    "SUPABASE_URL",
+    "NEXT_PUBLIC_SUPABASE_URL",
+    "commume_coffee_SUPABASE_URL",
+    "NEXT_PUBLIC_commume_coffee_SUPABASE_URL",
+  );
+  const key = env(
+    "SUPABASE_SECRET_KEY",
+    "commume_coffee_SUPABASE_SECRET_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "commume_coffee_SUPABASE_SERVICE_ROLE_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY_2",
+  );
+
+  if (!url || !key) {
+    throw new Error(
+      "Supabase credentials are missing. Add the real SUPABASE_URL and SUPABASE_SECRET_KEY to .env.local, then restart Next.js.",
+    );
+  }
+
+  if (!/^https:\/\/[^/]+\.supabase\.co$/.test(url)) {
+    throw new Error("SUPABASE_URL must be the full https://<project-ref>.supabase.co URL.");
+  }
+
+  return createClient(url, key, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
 }
 
 function seedOrders(): Order[] {
