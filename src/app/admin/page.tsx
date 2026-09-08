@@ -23,7 +23,7 @@ export default async function AdminPage() {
       />
 
 
-      <AdminShell session={session} users={store.users.map(publicUser)}>
+      <AdminShell session={session} users={store.users.map(publicUser)} store={store}>
         <AdminDashboard />
       </AdminShell>
     </main>

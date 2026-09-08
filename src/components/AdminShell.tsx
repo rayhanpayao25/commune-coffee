@@ -5,17 +5,18 @@ import { UserManager } from "@/components/UserManager";
 import { StockAndUsageExample } from "@/components/StockAndUsageExample";
 import { SalePurchaseTransactions } from "@/components/SalePurchaseTransactions";
 import type { PublicStaffUser } from "@/lib/users";
-import type { Session } from "@/lib/types";
+import type { Session, StoreData } from "@/lib/types";
 
 type PanelType = "sales" | "staff" | "transactions" | "example";
 
 type AdminShellProps = {
   session: Session;
   users: PublicStaffUser[];
+  store: StoreData;
   children: ReactNode;
 };
 
-export function AdminShell({ session, users, children }: AdminShellProps) {
+export function AdminShell({ session, users, store, children }: AdminShellProps) {
   const [panel, setPanel] = useState<PanelType>("sales");
   const [isMounted, setIsMounted] = useState(false);
 
@@ -96,7 +97,7 @@ export function AdminShell({ session, users, children }: AdminShellProps) {
       {/* Render based on selected panel */}
       {panel === "sales" && children}
       {panel === "staff" && <UserManager users={users} session={session} />}
-      {panel === "transactions" && <SalePurchaseTransactions />}
+      {panel === "transactions" && <SalePurchaseTransactions store={store} />}
       {panel === "example" && <StockAndUsageExample />}
     </>
   );

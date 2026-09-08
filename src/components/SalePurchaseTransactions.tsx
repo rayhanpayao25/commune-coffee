@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import type { StoreData } from "@/lib/types";
 
 type TabType = "transactions" | "stock" | "restock" | "costing" | "used";
 
@@ -40,8 +41,30 @@ type UsageRecord = {
   unit: string;
 };
 
-export function SalePurchaseTransactions() {
+export function SalePurchaseTransactions({ store }: { store: StoreData }) {
   const [activeTab, setActiveTab] = useState<TabType>("transactions");
+  const persistedTransactions: Transaction[] = store.orders.map((order) => ({
+    id: order.id,
+    productName: order.items.map((item) => `${item.qty}x ${item.name}`).join(", "),
+    type: "Sale",
+    quantity: order.items.reduce((sum, item) => sum + item.qty, 0),
+    price: order.total,
+    amount: order.total,
+    date: order.createdAt.slice(0, 10),
+  }));
+  const persistedStocks: StockItem[] = store.inventory.map((item) => ({
+    id: item.id,
+    name: item.name,
+    category: item.category,
+    stock: item.stock,
+  }));
+  const persistedUsages: UsageRecord[] = store.usageLogs.map((entry) => ({
+    id: entry.id,
+    date: entry.date,
+    itemName: entry.itemName,
+    usedAmount: entry.usedAmount,
+    unit: entry.unit,
+  }));
 
   const getTodayDate = () => {
     const d = new Date();
@@ -62,28 +85,9 @@ export function SalePurchaseTransactions() {
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
   };
 
-  const [transactions, setTransactions] = useState<Transaction[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("sys_transactions");
-      if (saved) return JSON.parse(saved);
-    }
-    return [
-      { id: "1", productName: "Iced Latte", type: "Sale", quantity: 2, price: 120.00, amount: 240.00, date: "2026-09-08" },
-    ];
-  });
+  const [transactions, setTransactions] = useState<Transaction[]>(persistedTransactions);
 
-  const [stocks, setStocks] = useState<StockItem[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("sys_stocks");
-      if (saved) return JSON.parse(saved);
-    }
-    return [
-      { id: "1", name: "Coffee Beans", category: "Ingredients", stock: 1000 },
-      { id: "2", name: "Milk", category: "Dairy", stock: 5000 },
-      { id: "3", name: "Cups", category: "Packaging", stock: 200 },
-      { id: "4", name: "Matcha Powder", category: "Ingredients", stock: 500 },
-    ];
-  });
+  const [stocks, setStocks] = useState<StockItem[]>(persistedStocks);
 
   const [restocks, setRestocks] = useState<RestockRecord[]>(() => {
     if (typeof window !== "undefined") {
@@ -113,72 +117,7 @@ export function SalePurchaseTransactions() {
     ];
   });
 
-  const [usages, setUsages] = useState<UsageRecord[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("sys_usages");
-      if (saved) return JSON.parse(saved);
-    }
-    return [];
-  });
-useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    // Subukan ang iba't ibang posibleng local storage keys na maaaring gamitin ng POS mo
-    const possibleKeys = ["store", "orders", "pos_orders", "cart_orders"];
-    let posOrders: any[] = [];
-
-    for (const key of possibleKeys) {
-      const data = localStorage.getItem(key);
-      if (data) {
-        try {
-          const parsed = JSON.parse(data);
-          if (Array.isArray(parsed)) {
-            posOrders = parsed;
-            break;
-          } else if (parsed && Array.isArray(parsed.orders)) {
-            posOrders = parsed.orders;
-            break;
-          }
-        } catch (e) {
-          // ignore parse errors
-        }
-      }
-    }
-
-    if (posOrders.length > 0) {
-      posOrders.forEach((order: any) => {
-        const orderDate = order.createdAt ? order.createdAt.split("T")[0] : getTodayDate();
-        
-        // Handle iba't ibang structure ng items array (e.g. order.items o order.cart)
-        const itemsList = order.items || order.cart || [];
-        if (itemsList.length === 0) return;
-
-        const productString = itemsList.map((i: any) => `${i.qty || i.quantity || 1}x ${i.name}`).join(", ");
-        const totalAmount = order.total || order.amount || 0;
-        const totalQty = itemsList.reduce((acc: number, item: any) => acc + (item.qty || item.quantity || 1), 0);
-
-        setTransactions((prevTx) => {
-          const exists = prevTx.some((t) => t.id === order.id);
-          if (exists) return prevTx;
-
-          const newTx: Transaction = {
-            id: order.id || Date.now().toString(),
-            productName: productString,
-            type: "Sale",
-            quantity: totalQty,
-            price: totalAmount,
-            amount: totalAmount,
-            date: orderDate,
-          };
-
-          applyTransactionInventoryEffect(productString, "Sale", totalQty, orderDate, false);
-
-          return [newTx, ...prevTx];
-        });
-      });
-    }
-  }, []);
-
+  const [usages, setUsages] = useState<UsageRecord[]>(persistedUsages);
   const [editTxId, setEditTxId] = useState<string | null>(null);
   const [txProduct, setTxProduct] = useState("");
   const [txType, setTxType] = useState<"Purchase" | "Sale">("Sale");
