@@ -5,7 +5,7 @@ import { getSession } from "@/lib/auth";
 import { nextTicketNo } from "@/lib/escpos";
 import { parsePayment } from "@/lib/payments";
 import { updateStore } from "@/lib/store";
-import type { OrderItem } from "@/lib/types";
+import type { OrderItem, StoreData } from "@/lib/types";
 
 async function requireBarista() {
   const session = await getSession();
@@ -13,6 +13,71 @@ async function requireBarista() {
     throw new Error("Only the barista can use the POS.");
   }
   return session;
+}
+
+async function requireAdmin() {
+  const session = await getSession();
+  if (!session || session.role !== "admin") {
+    throw new Error("Only an admin can change store records.");
+  }
+}
+
+function ingredientsForOrderLine(store: StoreData, line: OrderItem) {
+  const menuItem = store.menu.find((item) => item.id === line.productId);
+  const isMatcha = menuItem?.category === "Matcha Drinks" || /matcha|hojicha/i.test(line.name);
+  const configured = store.recipes[line.productId] ?? [];
+
+  if (!isMatcha) return configured;
+
+  const matchaInventory = store.inventory.find(
+    (item) => item.id === "matcha-powder" || /matcha powder/i.test(item.name),
+  );
+  if (!matchaInventory) return configured;
+
+  return [
+    ...configured.filter((ingredient) => ingredient.inventoryItemId !== matchaInventory.id),
+    {
+      inventoryItemId: matchaInventory.id,
+      name: matchaInventory.name,
+      amount: 10,
+      unit: "grams",
+    },
+  ];
+}
+
+export async function saveAdminData(data: {
+  inventory?: StoreData["inventory"];
+  restocks?: StoreData["restocks"];
+  costings?: StoreData["costings"];
+  usageLogs?: StoreData["usageLogs"];
+}) {
+  await requireAdmin();
+  await updateStore((store) => {
+    if (data.inventory) store.inventory = data.inventory;
+    if (data.restocks) store.restocks = data.restocks;
+    if (data.costings) store.costings = data.costings;
+    if (data.usageLogs) store.usageLogs = data.usageLogs;
+  });
+  revalidatePath("/admin");
+  return { ok: true };
+}
+
+export async function deleteAdminRecord(kind: "order" | "inventory" | "restock" | "costing", id: string) {
+  await requireAdmin();
+  await updateStore((store) => {
+    if (kind === "order") {
+      store.orders = store.orders.filter((order) => order.id !== id);
+      store.usageLogs = store.usageLogs.filter((entry) => entry.orderId !== id);
+    } else if (kind === "inventory") {
+      store.inventory = store.inventory.filter((item) => item.id !== id);
+    } else if (kind === "restock") {
+      store.restocks = store.restocks.filter((record) => record.id !== id);
+    } else {
+      store.costings = store.costings.filter((record) => record.id !== id);
+    }
+  });
+  revalidatePath("/admin");
+  return { ok: true };
 }
 
 export async function openPos() {
@@ -85,7 +150,7 @@ export async function createOrder(
 
     const requestedStock = new Map<string, number>();
     for (const line of priced) {
-      for (const ingredient of store.recipes[line.productId] ?? []) {
+      for (const ingredient of ingredientsForOrderLine(store, line)) {
         const inventory = store.inventory.find(
           (item) =>
             item.id === ingredient.inventoryItemId ||
@@ -139,7 +204,7 @@ export async function createOrder(
     const usageEntries = [] as typeof store.usageLogs;
 
     for (const line of priced) {
-      const ingredients = store.recipes[line.productId] ?? [];
+      const ingredients = ingredientsForOrderLine(store, line);
       for (const ingredient of ingredients) {
         const amount = ingredient.amount * line.qty;
         const inventory = store.inventory.find((item) =>

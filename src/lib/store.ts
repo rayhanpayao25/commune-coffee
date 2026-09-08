@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import type { InventoryItem, MenuItem, Order, Promotion, RecipeIngredient, StaffUser, StoreData } from "@/lib/types";
+import type { InventoryItem, MenuItem, Order, Promotion, RecipeIngredient, StaffUser, StoreData, CostingItem } from "@/lib/types";
 import { DEFAULT_MENU, MENU_CATEGORIES } from "@/lib/menu";
 import { parsePayment } from "@/lib/payments";
 import { DEFAULT_PROMOS } from "@/lib/promos";
@@ -112,6 +112,12 @@ const DEFAULT_INVENTORY: InventoryItem[] = [
   { id: "matcha-powder", name: "Matcha Powder", category: "Ingredients", unit: "grams", cost: 450, stock: 500, maxStock: 1000 },
 ];
 
+const DEFAULT_COSTINGS: CostingItem[] = [
+  { id: "cost-coffee-beans", productName: "Coffee Beans", ingredients: [{ name: "Coffee Beans", amount: 1000, unit: "grams", outputCups: 55 }] },
+  { id: "cost-milk", productName: "Milk", ingredients: [{ name: "Milk", amount: 1000, unit: "ml", outputCups: 7.5 }] },
+  { id: "cost-matcha", productName: "Matcha Powder", ingredients: [{ name: "Matcha Powder", amount: 150, unit: "grams", outputCups: 15 }] },
+];
+
 const DEFAULT_RECIPES: Record<string, RecipeIngredient[]> = Object.fromEntries(
   DEFAULT_MENU.map((item) => [item.id, [
     { inventoryItemId: "coffee-beans", name: "Coffee Beans", amount: 18, unit: "grams" },
@@ -131,6 +137,8 @@ function emptyStore(): StoreData {
     inventory: DEFAULT_INVENTORY.map((item) => ({ ...item })),
     recipes: structuredClone(DEFAULT_RECIPES),
     usageLogs: [],
+    restocks: [],
+    costings: structuredClone(DEFAULT_COSTINGS),
   };
 }
 
@@ -198,6 +206,25 @@ function normalizeStore(store: StoreData): StoreData {
   if (!Array.isArray(store.usageLogs)) {
     store.usageLogs = [];
   }
+  if (!Array.isArray(store.restocks)) {
+    store.restocks = [];
+  }
+  if (!Array.isArray(store.costings)) {
+    store.costings = [];
+  }
+
+  const matchaInventory = store.inventory.find((item) => /matcha/i.test(item.name));
+  const hasMatchaCosting = store.costings.some((costing) =>
+    costing.ingredients.some((ingredient) => /matcha/i.test(ingredient.name)),
+  );
+  if (matchaInventory && !hasMatchaCosting) {
+    store.costings.push({
+      id: "cost-matcha-powder",
+      productName: "Matcha Powder",
+      ingredients: [{ name: matchaInventory.name, amount: 150, unit: "grams", outputCups: 15 }],
+    });
+  }
+
   if (!Array.isArray(store.users) || store.users.length === 0) {
     store.users = DEFAULT_USERS.map((item) => ({ ...item }));
   } else {
@@ -229,7 +256,14 @@ async function readStore(): Promise<StoreData> {
     await writeStore(store);
     return store;
   }
-  return normalizeStore(data.payload as StoreData);
+
+  const original = data.payload as StoreData;
+  const store = normalizeStore(original);
+  const originalCostings = Array.isArray(original.costings) ? original.costings : [];
+  if (store.costings.length !== originalCostings.length) {
+    await writeStore(store);
+  }
+  return store;
 }
 
 async function writeStore(store: StoreData): Promise<void> {

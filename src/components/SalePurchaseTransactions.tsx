@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { deleteAdminRecord, saveAdminData } from "@/actions/pos";
 import type { StoreData } from "@/lib/types";
 
 type TabType = "transactions" | "stock" | "restock" | "costing" | "used";
@@ -27,11 +28,11 @@ type RestockRecord = {
   date: string;
 };
 
-type CostingItem = {
-  id: string;
-  productName: string;
-  ingredients: { name: string; amount: number; unit: string }[];
-};
+  type CostingItem = {
+    id: string;
+    productName: string;
+    ingredients: { name: string; amount: number; unit: string; outputCups?: number }[];
+  };
 
 type UsageRecord = {
   id: string;
@@ -89,33 +90,8 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
 
   const [stocks, setStocks] = useState<StockItem[]>(persistedStocks);
 
-  const [restocks, setRestocks] = useState<RestockRecord[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("sys_restocks");
-      if (saved) return JSON.parse(saved);
-    }
-    return [
-      { id: "1", itemName: "Coffee Beans", quantityAdded: 1000, date: "2026-09-07 10:00:00" },
-    ];
-  });
-
-  const [costings, setCostings] = useState<CostingItem[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("sys_costings");
-      if (saved) return JSON.parse(saved);
-    }
-    return [
-      {
-        id: "1",
-        productName: "Iced Latte",
-        ingredients: [
-          { name: "Coffee Beans", amount: 18, unit: "grams" },
-          { name: "Milk", amount: 133, unit: "ml" },
-          { name: "Cups", amount: 1, unit: "pcs" },
-        ],
-      },
-    ];
-  });
+  const [restocks, setRestocks] = useState<RestockRecord[]>(store.restocks ?? []);
+  const [costings, setCostings] = useState<CostingItem[]>(store.costings ?? []);
 
   const [usages, setUsages] = useState<UsageRecord[]>(persistedUsages);
 
@@ -123,7 +99,9 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
     setTransactions(persistedTransactions);
     setStocks(persistedStocks);
     setUsages(persistedUsages);
-  }, [store.orders, store.inventory, store.usageLogs]);
+    setRestocks(store.restocks ?? []);
+    setCostings(store.costings ?? []);
+  }, [store.orders, store.inventory, store.usageLogs, store.restocks, store.costings]);
 
   const [editTxId, setEditTxId] = useState<string | null>(null);
   const [txProduct, setTxProduct] = useState("");
@@ -144,8 +122,8 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
 
   const [editCostingId, setEditCostingId] = useState<string | null>(null);
   const [costingProduct, setCostingProduct] = useState("");
-  const [costingIngs, setCostingIngs] = useState<{ name: string; amount: number; unit: string }[]>([
-    { name: "", amount: 0, unit: "" },
+  const [costingIngs, setCostingIngs] = useState<{ name: string; amount: number; unit: string; outputCups?: number }[]>([
+    { name: "", amount: 0, unit: "", outputCups: 0 },
   ]);
 
   const [inlineRestockValues, setInlineRestockValues] = useState<{ [key: string]: string }>({});
@@ -153,6 +131,26 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
   const [filterType, setFilterType] = useState("All");
   const [filterKeyword, setFilterKeyword] = useState("");
   const [selectedDateFilter, setSelectedDateFilter] = useState("");
+
+  const handleTotalUsedChange = (itemName: string, value: string) => {
+    const nextTotal = Math.max(0, Number(value) || 0);
+    setUsages((currentUsages) => {
+      const matching = currentUsages.filter((usage) => usage.itemName.toLowerCase() === itemName.toLowerCase());
+      if (matching.length === 0) {
+        return nextTotal === 0
+          ? currentUsages
+          : [{ id: Date.now().toString(), date: getTodayDate(), itemName, usedAmount: nextTotal, unit: "units" }, ...currentUsages];
+      }
+
+      const firstId = matching[0].id;
+      const otherUsageTotal = matching.slice(1).reduce((sum, usage) => sum + usage.usedAmount, 0);
+      return currentUsages.map((usage) =>
+        usage.id === firstId
+          ? { ...usage, usedAmount: Math.max(0, nextTotal - otherUsageTotal) }
+          : usage,
+      );
+    });
+  };
 
   const applyTransactionInventoryEffect = (productName: string, type: "Purchase" | "Sale", quantity: number, dateStr: string, isRevert = false) => {
     setStocks((prevStocks) => {
@@ -228,15 +226,14 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
     setTxDate(t.date);
   };
 
-  const handleDeleteTransaction = (id: string) => {
+  const handleDeleteTransaction = async (id: string) => {
     const tx = transactions.find((t) => t.id === id);
-    if (tx) {
-      applyTransactionInventoryEffect(tx.productName, tx.type, tx.quantity, tx.date, true);
-    }
-    setTransactions(transactions.filter((t) => t.id !== id));
+    if (tx) applyTransactionInventoryEffect(tx.productName, tx.type, tx.quantity, tx.date, true);
+    setTransactions((current) => current.filter((t) => t.id !== id));
+    await deleteAdminRecord("order", id);
   };
 
-  const handleSaveStock = (e: React.FormEvent) => {
+  const handleSaveStock = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!stockName || !stockCategory || !stockQty) return;
     const qty = Number(stockQty);
@@ -244,10 +241,22 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
 
     if (editStockId) {
       setStocks(stocks.map((s) => s.id === editStockId ? { ...s, name: stockName, category: stockCategory, stock: qty } : s));
+      const nextStocks = stocks.map((s) => s.id === editStockId ? { ...s, name: stockName, category: stockCategory, stock: qty } : s);
+      setStocks(nextStocks);
+      await saveAdminData({
+        inventory: store.inventory.map((item) => {
+          const next = nextStocks.find((stock) => stock.id === item.id);
+          return next ? { ...item, name: next.name, category: next.category, stock: next.stock } : item;
+        }),
+      });
       setEditStockId(null);
     } else {
       const newItem: StockItem = { id: Date.now().toString(), name: stockName, category: stockCategory, stock: qty };
-      setStocks([...stocks, newItem]);
+      const nextStocks = [...stocks, newItem];
+      setStocks(nextStocks);
+      await saveAdminData({
+        inventory: [...store.inventory, { id: newItem.id, name: newItem.name, category: newItem.category, stock: newItem.stock, unit: "pcs", cost: 0, maxStock: newItem.stock }],
+      });
 
       const newRestock: RestockRecord = {
         id: Date.now().toString() + Math.random(),
@@ -267,18 +276,26 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
     setStockQty(s.stock.toString());
   };
 
-  const handleDeleteStock = (id: string) => {
-    setStocks(stocks.filter((s) => s.id !== id));
+  const handleDeleteStock = async (id: string) => {
+    setStocks((current) => current.filter((s) => s.id !== id));
+    await deleteAdminRecord("inventory", id);
   };
 
-  const handleInlineRestock = (item: StockItem) => {
+  const handleInlineRestock = async (item: StockItem) => {
     const amountStr = inlineRestockValues[item.id];
     if (!amountStr) return;
     const addQty = Number(amountStr);
     if (isNaN(addQty) || addQty <= 0) return;
     const nowTime = getNowDateTime();
 
-    setStocks(stocks.map((s) => s.id === item.id ? { ...s, stock: s.stock + addQty } : s));
+    const nextStocks = stocks.map((s) => s.id === item.id ? { ...s, stock: s.stock + addQty } : s);
+    setStocks(nextStocks);
+    await saveAdminData({
+      inventory: store.inventory.map((inventory) => {
+        const next = nextStocks.find((stock) => stock.id === inventory.id);
+        return next ? { ...inventory, stock: next.stock } : inventory;
+      }),
+    });
 
     const newRestock: RestockRecord = {
       id: Date.now().toString() + Math.random(),
@@ -286,23 +303,29 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
       quantityAdded: addQty,
       date: nowTime,
     };
-    setRestocks([newRestock, ...restocks]);
+    const nextRestocks = [newRestock, ...restocks];
+    setRestocks(nextRestocks);
+    await saveAdminData({ restocks: nextRestocks });
 
     setInlineRestockValues({ ...inlineRestockValues, [item.id]: "" });
   };
 
-  const handleSaveRestock = (e: React.FormEvent) => {
+  const handleSaveRestock = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!restockItem || !restockQty || !restockDate) return;
     const qty = Number(restockQty);
     const nowTime = getNowDateTime();
 
     if (editRestockId) {
-      setRestocks(restocks.map((r) => r.id === editRestockId ? { ...r, itemName: restockItem, quantityAdded: qty, date: restockDate } : r));
+      const nextRestocks = restocks.map((r) => r.id === editRestockId ? { ...r, itemName: restockItem, quantityAdded: qty, date: restockDate } : r);
+      setRestocks(nextRestocks);
+      await saveAdminData({ restocks: nextRestocks });
       setEditRestockId(null);
     } else {
       const newRestock: RestockRecord = { id: Date.now().toString(), itemName: restockItem, quantityAdded: qty, date: nowTime };
-      setRestocks([newRestock, ...restocks]);
+      const nextRestocks = [newRestock, ...restocks];
+      setRestocks(nextRestocks);
+      await saveAdminData({ restocks: nextRestocks });
       
       setStocks((prev) =>
         prev.map((s) => s.name.toLowerCase() === restockItem.toLowerCase() ? { ...s, stock: s.stock + qty } : s)
@@ -318,23 +341,28 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
     setRestockDate(r.date);
   };
 
-  const handleDeleteRestock = (id: string) => {
-    setRestocks(restocks.filter((r) => r.id !== id));
+  const handleDeleteRestock = async (id: string) => {
+    setRestocks((current) => current.filter((r) => r.id !== id));
+    await deleteAdminRecord("restock", id);
   };
 
-  const handleSaveCosting = (e: React.FormEvent) => {
+  const handleSaveCosting = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!costingProduct) return;
 
     if (editCostingId) {
-      setCostings(costings.map((c) => c.id === editCostingId ? { ...c, productName: costingProduct, ingredients: costingIngs } : c));
+      const nextCostings = costings.map((c) => c.id === editCostingId ? { ...c, productName: costingProduct, ingredients: costingIngs } : c);
+      setCostings(nextCostings);
+      await saveAdminData({ costings: nextCostings });
       setEditCostingId(null);
     } else {
       const newCosting: CostingItem = { id: Date.now().toString(), productName: costingProduct, ingredients: costingIngs };
-      setCostings([...costings, newCosting]);
+      const nextCostings = [...costings, newCosting];
+      setCostings(nextCostings);
+      await saveAdminData({ costings: nextCostings });
     }
     setCostingProduct("");
-    setCostingIngs([{ name: "", amount: 0, unit: "" }]);
+    setCostingIngs([{ name: "", amount: 0, unit: "", outputCups: 0 }]);
   };
 
   const handleEditCosting = (c: CostingItem) => {
@@ -343,8 +371,9 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
     setCostingIngs(c.ingredients);
   };
 
-  const handleDeleteCosting = (id: string) => {
-    setCostings(costings.filter((c) => c.id !== id));
+  const handleDeleteCosting = async (id: string) => {
+    setCostings((current) => current.filter((c) => c.id !== id));
+    await deleteAdminRecord("costing", id);
   };
 
   const filteredTransactions = transactions.filter((t) => {
@@ -471,6 +500,11 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
 
       {activeTab === "stock" && (
         <div className="space-y-6">
+          <div className="flex items-center gap-3 bg-[#d1e8e9] p-3 rounded-lg border border-neutral-400 text-sm">
+            <label className="text-xs text-neutral-600">Filter date:</label>
+            <input type="date" value={selectedDateFilter} onChange={(e) => setSelectedDateFilter(e.target.value)} className="bg-white border border-neutral-400 rounded px-2 py-1 text-xs" />
+            {selectedDateFilter && <button onClick={() => setSelectedDateFilter("")} className="text-xs text-blue-600 underline">Reset</button>}
+          </div>
           <div className="bg-[#d1e8e9] p-4 rounded-lg border border-neutral-400 space-y-4">
             <h3 className="text-xs font-bold text-neutral-700 uppercase">{editStockId ? "Edit Stock Item" : "Add Stock Item"}</h3>
             <form onSubmit={handleSaveStock} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
@@ -497,28 +531,90 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="bg-[#b5d6d8] border-b border-neutral-400 text-neutral-800 text-xs font-semibold">
+                  <th className="p-3 border-r border-neutral-300">Date</th>
                   <th className="p-3 border-r border-neutral-300">Item Name</th>
                   <th className="p-3 border-r border-neutral-300">Category</th>
                   <th className="p-3 border-r border-neutral-300 text-right">Current Stock</th>
-                  <th className="p-3 border-r border-neutral-300 text-right">Total Used</th>
+                  <th className="p-3 border-r border-neutral-300 text-center">Restock</th>
+                  <th className="p-3 border-r border-neutral-300 text-right">Total Stock</th>
+                  <th className="p-3 border-r border-neutral-300 text-right">Used Stock</th>
                   <th className="p-3 border-r border-neutral-300 text-right">Remaining Stock</th>
                   <th className="p-3 border-r border-neutral-300 text-center">Restock</th>
                   <th className="p-3 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {stocks.map((s) => {
-                  const totalUsed = usages
-                    .filter((u) => u.itemName.toLowerCase() === s.name.toLowerCase())
+                {(() => {
+                  const hasSelectedDateData = !selectedDateFilter || store.orders.some((order) => order.createdAt.slice(0, 10) === selectedDateFilter) || restocks.some((record) => record.date.slice(0, 10) === selectedDateFilter) || usages.some((usage) => usage.date.slice(0, 10) === selectedDateFilter);
+                  if (!hasSelectedDateData) {
+                    return <tr><td colSpan={10} className="p-8 text-center text-sm text-neutral-500">No stock data for {selectedDateFilter}.</td></tr>;
+                  }
+                  return stocks.map((s) => {
+                  const isMatcha = /matcha/i.test(`${s.name} ${s.category}`);
+                  const orderUsed = isMatcha
+                    ? store.orders.filter((order) => !selectedDateFilter || order.createdAt.slice(0, 10) <= selectedDateFilter).reduce((sum, order) => sum + order.items
+                      .filter((item) => /matcha|hojicha/i.test(`${item.name} ${item.productId}`))
+                      .reduce((itemSum, item) => itemSum + item.qty * 10, 0), 0)
+                    : 0;
+                  const loggedUsed = usages
+                    .filter((u) => {
+                      if (selectedDateFilter && u.date.slice(0, 10) > selectedDateFilter) return false;
+                      const usageName = u.itemName.toLowerCase();
+                      const stockName = s.name.toLowerCase();
+                      return usageName === stockName || usageName.includes(stockName) || stockName.includes(usageName);
+                    })
                     .reduce((acc, curr) => acc + curr.usedAmount, 0);
+                  const totalUsed = isMatcha ? Math.max(orderUsed, loggedUsed) : loggedUsed;
+                  const totalRestocked = restocks
+                    .filter((record) => record.itemName.toLowerCase() === s.name.toLowerCase() && (!selectedDateFilter || record.date.slice(0, 10) <= selectedDateFilter))
+                    .reduce((sum, record) => sum + record.quantityAdded, 0);
+                  const packSize = isMatcha ? 150 : 1;
+                  const totalStock = s.stock + totalRestocked;
+                  const stockInBaseUnits = totalStock * packSize;
+                  const remainingBaseUnits = Math.max(0, stockInBaseUnits - totalUsed);
+                  const remainingPacks = isMatcha ? remainingBaseUnits / packSize : remainingBaseUnits;
+                  const remainingCups = isMatcha ? remainingBaseUnits / 10 : 0;
 
                   return (
                     <tr key={s.id} className="border-b border-neutral-200 text-xs">
+                      <td className="p-3 border-r border-neutral-200 text-neutral-600">{selectedDateFilter || getTodayDate()}</td>
                       <td className="p-3 border-r border-neutral-200 font-medium">{s.name}</td>
                       <td className="p-3 border-r border-neutral-200 text-neutral-600">{s.category}</td>
-                      <td className="p-3 border-r border-neutral-200 text-right font-bold">{s.stock}</td>
-                      <td className="p-3 border-r border-neutral-200 text-right text-red-600 font-medium">{totalUsed}</td>
-                      <td className="p-3 border-r border-neutral-200 text-right font-bold">{s.stock + totalUsed}</td>
+                      <td className="p-2 border-r border-neutral-200 text-right font-bold">
+                        <input
+                          aria-label={`Current Stock for ${s.name}`}
+                          type="number"
+                          min="0"
+                          value={s.stock}
+                          onChange={(e) => {
+                            const nextStock = Math.max(0, Number(e.target.value) || 0);
+                            setStocks((currentStocks) => currentStocks.map((item) => item.id === s.id ? { ...item, stock: nextStock } : item));
+                          }}
+                          className="w-24 bg-white border border-neutral-400 rounded px-2 py-1 text-right font-bold"
+                        />
+                      </td>
+                      <td className="p-3 border-r border-neutral-200 text-right font-semibold">
+                        {isMatcha ? `${totalRestocked} packs` : totalRestocked}
+                      </td>
+                      <td className="p-3 border-r border-neutral-200 text-right font-bold">
+                        {isMatcha ? `${totalStock} packs (${stockInBaseUnits.toFixed(0)} g)` : stockInBaseUnits}
+                      </td>
+                      <td className="p-2 border-r border-neutral-200 text-right text-red-600 font-medium">
+                        <input
+                          aria-label={`Used Stock for ${s.name}`}
+                          type="number"
+                          min="0"
+                          value={totalUsed}
+                          onChange={(e) => handleTotalUsedChange(s.name, e.target.value)}
+                          className="w-24 bg-white border border-neutral-400 rounded px-2 py-1 text-right text-red-600 font-medium"
+                        />
+                        {isMatcha && <span className="ml-1">g</span>}
+                      </td>
+                      <td className="p-3 border-r border-neutral-200 text-right font-bold">
+                        {isMatcha
+                          ? `${remainingPacks.toFixed(2)} packs (${remainingBaseUnits.toFixed(0)} g; ${remainingCups.toFixed(0)} cups)`
+                          : remainingBaseUnits}
+                      </td>
                       <td className="p-3 border-r border-neutral-200 text-center">
                         <div className="flex items-center justify-center gap-1">
                           <input
@@ -543,7 +639,7 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                       </td>
                     </tr>
                   );
-                })}
+                })})()}
               </tbody>
             </table>
           </div>
@@ -585,7 +681,7 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                 </tr>
               </thead>
               <tbody>
-                {restocks.map((r) => (
+                  {restocks.filter((r) => !selectedDateFilter || r.date.slice(0, 10) === selectedDateFilter).map((r) => (
                   <tr key={r.id} className="border-b border-neutral-200 text-xs">
                     <td className="p-3 border-r border-neutral-200 text-neutral-600 font-medium">{r.date}</td>
                     <td className="p-3 border-r border-neutral-200 font-medium">{r.itemName}</td>
@@ -628,22 +724,27 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                       updated[idx].amount = Number(e.target.value);
                       setCostingIngs(updated);
                     }} className="w-24 bg-white border border-neutral-400 rounded px-3 py-1.5 text-sm" />
-                    <input type="text" placeholder="Unit" value={ing.unit} onChange={(e) => {
+                      <input type="text" placeholder="Unit" value={ing.unit} onChange={(e) => {
                       const updated = [...costingIngs];
                       updated[idx].unit = e.target.value;
                       setCostingIngs(updated);
                     }} className="w-28 bg-white border border-neutral-400 rounded px-3 py-1.5 text-sm" />
+                    <input type="number" min="0" step="0.01" placeholder="Cups produced" value={ing.outputCups || ""} onChange={(e) => {
+                      const updated = [...costingIngs];
+                      updated[idx].outputCups = Number(e.target.value);
+                      setCostingIngs(updated);
+                    }} className="w-28 bg-white border border-neutral-400 rounded px-3 py-1.5 text-sm" aria-label="Cups produced" />
                     <button type="button" onClick={() => setCostingIngs(costingIngs.filter((_, i) => i !== idx))} className="text-red-600 text-xs px-2">Remove</button>
                   </div>
                 ))}
-                <button type="button" onClick={() => setCostingIngs([...costingIngs, { name: "", amount: 0, unit: "" }])} className="text-xs bg-[#2d7a75] text-white px-3 py-1 rounded">
+                <button type="button" onClick={() => setCostingIngs([...costingIngs, { name: "", amount: 0, unit: "", outputCups: 0 }])} className="text-xs bg-[#2d7a75] text-white px-3 py-1 rounded">
                   + Add Ingredient
                 </button>
               </div>
 
               <div className="flex gap-2 pt-2">
                 <button type="submit" className="bg-[#1b5e5a] text-white px-4 py-1.5 rounded text-sm font-medium">{editCostingId ? "Update Costing" : "Save Costing"}</button>
-                <button type="button" onClick={() => { setEditCostingId(null); setCostingProduct(""); setCostingIngs([{ name: "", amount: 0, unit: "" }]); }} className="bg-[#2d7a75] text-white px-4 py-1.5 rounded text-sm font-medium">Clear</button>
+                <button type="button" onClick={() => { setEditCostingId(null); setCostingProduct(""); setCostingIngs([{ name: "", amount: 0, unit: "", outputCups: 0 }]); }} className="bg-[#2d7a75] text-white px-4 py-1.5 rounded text-sm font-medium">Clear</button>
               </div>
             </form>
           </div>
@@ -652,20 +753,55 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="bg-[#b5d6d8] border-b border-neutral-400 text-neutral-800 text-xs font-semibold">
-                  <th className="p-3 border-r border-neutral-300">Product Name</th>
-                  <th className="p-3 border-r border-neutral-300">Ingredients Breakdown</th>
+                  <th className="p-3 border-r border-neutral-300">Date</th>
+                  <th className="p-3 border-r border-neutral-300">Item</th>
+                  <th className="p-3 border-r border-neutral-300">Cups</th>
+                  <th className="p-3 border-r border-neutral-300">Used</th>
+                  <th className="p-3 border-r border-neutral-300">Stock</th>
+                  <th className="p-3 border-r border-neutral-300">Available</th>
                   <th className="p-3 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {costings.map((c) => (
                   <tr key={c.id} className="border-b border-neutral-200 text-xs">
-                    <td className="p-3 border-r border-neutral-200 font-medium">{c.productName}</td>
-                    <td className="p-3 border-r border-neutral-200 text-neutral-600">
-                      {c.ingredients.map((ing, i) => (
-                        <div key={i}>• {ing.name}: {ing.amount} {ing.unit}</div>
-                      ))}
-                    </td>
+                    {(() => {
+                      const ing = c.ingredients[0];
+                      const ingredientName = ing?.name.toLowerCase() ?? "";
+                      const stock = stocks.find((item) => {
+                        const itemName = item.name.toLowerCase();
+                        return itemName === ingredientName || itemName.includes(ingredientName) || ingredientName.includes(itemName);
+                      });
+                      const isMatcha = /matcha/i.test(ingredientName) || /matcha powder/i.test(stock?.name ?? "");
+                      const usedFromOrders = store.orders.reduce((sum, order) =>
+                        sum + order.items
+                          .filter((item) => /matcha|hojicha/i.test(`${item.name} ${item.productId}`))
+                          .reduce((itemSum, item) => itemSum + item.qty * 10, 0),
+                        0,
+                      );
+                      const used = isMatcha
+                        ? usedFromOrders
+                        : usages
+                          .filter((entry) => {
+                            const entryName = entry.itemName.toLowerCase();
+                            return entryName === ingredientName || entryName.includes(ingredientName) || ingredientName.includes(entryName);
+                          })
+                          .reduce((sum, entry) => sum + entry.usedAmount, 0);
+                      const packSize = isMatcha ? 150 : 1;
+                      const remainingStock = stock?.stock ?? 0;
+                      const currentStock = remainingStock * packSize + used;
+                      const available = Math.max(0, currentStock - used);
+                      const cupsUsed = ing && ing.amount > 0 && ing.outputCups ? (used / ing.amount) * ing.outputCups : 0;
+                      const cups = ing && ing.amount > 0 && ing.outputCups ? (available / ing.amount) * ing.outputCups : 0;
+                      return <>
+                        <td className="p-3 border-r border-neutral-200 text-neutral-600">{selectedDateFilter || getTodayDate()}</td>
+                        <td className="p-3 border-r border-neutral-200 font-medium">{c.productName}</td>
+                        <td className="p-3 border-r border-neutral-200 font-semibold">{cupsUsed.toFixed(2)}</td>
+                        <td className="p-3 border-r border-neutral-200 text-red-600">{used} {ing?.unit}</td>
+                        <td className="p-3 border-r border-neutral-200">{currentStock} {ing?.unit}</td>
+                        <td className="p-3 border-r border-neutral-200 font-semibold">{available} {ing?.unit} ({cups.toFixed(2)} cups)</td>
+                      </>;
+                    })()}
                     <td className="p-3 text-center space-x-2">
                       <button onClick={() => handleEditCosting(c)} className="text-blue-600 hover:underline font-medium text-xs">Edit</button>
                       <button onClick={() => handleDeleteCosting(c.id)} className="text-red-600 hover:underline font-medium text-xs">Delete</button>
