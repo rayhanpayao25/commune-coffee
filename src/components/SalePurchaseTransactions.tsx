@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { deleteAdminRecord } from "@/actions/pos";
+import { deleteAdminRecord, saveAdminData } from "@/actions/pos";
 import type { StoreData } from "@/lib/types";
 
 type TabType = "transactions" | "stock" | "restock" | "costing" | "used";
@@ -233,7 +233,7 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
     await deleteAdminRecord("order", id);
   };
 
-  const handleSaveStock = (e: React.FormEvent) => {
+  const handleSaveStock = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!stockName || !stockCategory || !stockQty) return;
     const qty = Number(stockQty);
@@ -241,10 +241,22 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
 
     if (editStockId) {
       setStocks(stocks.map((s) => s.id === editStockId ? { ...s, name: stockName, category: stockCategory, stock: qty } : s));
+      const nextStocks = stocks.map((s) => s.id === editStockId ? { ...s, name: stockName, category: stockCategory, stock: qty } : s);
+      setStocks(nextStocks);
+      await saveAdminData({
+        inventory: store.inventory.map((item) => {
+          const next = nextStocks.find((stock) => stock.id === item.id);
+          return next ? { ...item, name: next.name, category: next.category, stock: next.stock } : item;
+        }),
+      });
       setEditStockId(null);
     } else {
       const newItem: StockItem = { id: Date.now().toString(), name: stockName, category: stockCategory, stock: qty };
-      setStocks([...stocks, newItem]);
+      const nextStocks = [...stocks, newItem];
+      setStocks(nextStocks);
+      await saveAdminData({
+        inventory: [...store.inventory, { id: newItem.id, name: newItem.name, category: newItem.category, stock: newItem.stock, unit: "pcs", cost: 0, maxStock: newItem.stock }],
+      });
 
       const newRestock: RestockRecord = {
         id: Date.now().toString() + Math.random(),
@@ -269,14 +281,21 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
     await deleteAdminRecord("inventory", id);
   };
 
-  const handleInlineRestock = (item: StockItem) => {
+  const handleInlineRestock = async (item: StockItem) => {
     const amountStr = inlineRestockValues[item.id];
     if (!amountStr) return;
     const addQty = Number(amountStr);
     if (isNaN(addQty) || addQty <= 0) return;
     const nowTime = getNowDateTime();
 
-    setStocks(stocks.map((s) => s.id === item.id ? { ...s, stock: s.stock + addQty } : s));
+    const nextStocks = stocks.map((s) => s.id === item.id ? { ...s, stock: s.stock + addQty } : s);
+    setStocks(nextStocks);
+    await saveAdminData({
+      inventory: store.inventory.map((inventory) => {
+        const next = nextStocks.find((stock) => stock.id === inventory.id);
+        return next ? { ...inventory, stock: next.stock } : inventory;
+      }),
+    });
 
     const newRestock: RestockRecord = {
       id: Date.now().toString() + Math.random(),
@@ -284,23 +303,29 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
       quantityAdded: addQty,
       date: nowTime,
     };
-    setRestocks([newRestock, ...restocks]);
+    const nextRestocks = [newRestock, ...restocks];
+    setRestocks(nextRestocks);
+    await saveAdminData({ restocks: nextRestocks });
 
     setInlineRestockValues({ ...inlineRestockValues, [item.id]: "" });
   };
 
-  const handleSaveRestock = (e: React.FormEvent) => {
+  const handleSaveRestock = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!restockItem || !restockQty || !restockDate) return;
     const qty = Number(restockQty);
     const nowTime = getNowDateTime();
 
     if (editRestockId) {
-      setRestocks(restocks.map((r) => r.id === editRestockId ? { ...r, itemName: restockItem, quantityAdded: qty, date: restockDate } : r));
+      const nextRestocks = restocks.map((r) => r.id === editRestockId ? { ...r, itemName: restockItem, quantityAdded: qty, date: restockDate } : r);
+      setRestocks(nextRestocks);
+      await saveAdminData({ restocks: nextRestocks });
       setEditRestockId(null);
     } else {
       const newRestock: RestockRecord = { id: Date.now().toString(), itemName: restockItem, quantityAdded: qty, date: nowTime };
-      setRestocks([newRestock, ...restocks]);
+      const nextRestocks = [newRestock, ...restocks];
+      setRestocks(nextRestocks);
+      await saveAdminData({ restocks: nextRestocks });
       
       setStocks((prev) =>
         prev.map((s) => s.name.toLowerCase() === restockItem.toLowerCase() ? { ...s, stock: s.stock + qty } : s)
@@ -321,16 +346,20 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
     await deleteAdminRecord("restock", id);
   };
 
-  const handleSaveCosting = (e: React.FormEvent) => {
+  const handleSaveCosting = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!costingProduct) return;
 
     if (editCostingId) {
-      setCostings(costings.map((c) => c.id === editCostingId ? { ...c, productName: costingProduct, ingredients: costingIngs } : c));
+      const nextCostings = costings.map((c) => c.id === editCostingId ? { ...c, productName: costingProduct, ingredients: costingIngs } : c);
+      setCostings(nextCostings);
+      await saveAdminData({ costings: nextCostings });
       setEditCostingId(null);
     } else {
       const newCosting: CostingItem = { id: Date.now().toString(), productName: costingProduct, ingredients: costingIngs };
-      setCostings([...costings, newCosting]);
+      const nextCostings = [...costings, newCosting];
+      setCostings(nextCostings);
+      await saveAdminData({ costings: nextCostings });
     }
     setCostingProduct("");
     setCostingIngs([{ name: "", amount: 0, unit: "" }]);

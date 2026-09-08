@@ -5,7 +5,7 @@ import { getSession } from "@/lib/auth";
 import { nextTicketNo } from "@/lib/escpos";
 import { parsePayment } from "@/lib/payments";
 import { updateStore } from "@/lib/store";
-import type { OrderItem } from "@/lib/types";
+import type { OrderItem, StoreData } from "@/lib/types";
 
 async function requireBarista() {
   const session = await getSession();
@@ -20,6 +20,23 @@ async function requireAdmin() {
   if (!session || session.role !== "admin") {
     throw new Error("Only an admin can change store records.");
   }
+}
+
+export async function saveAdminData(data: {
+  inventory?: StoreData["inventory"];
+  restocks?: StoreData["restocks"];
+  costings?: StoreData["costings"];
+  usageLogs?: StoreData["usageLogs"];
+}) {
+  await requireAdmin();
+  await updateStore((store) => {
+    if (data.inventory) store.inventory = data.inventory;
+    if (data.restocks) store.restocks = data.restocks;
+    if (data.costings) store.costings = data.costings;
+    if (data.usageLogs) store.usageLogs = data.usageLogs;
+  });
+  revalidatePath("/admin");
+  return { ok: true };
 }
 
 export async function deleteAdminRecord(kind: "order" | "inventory" | "restock" | "costing", id: string) {
