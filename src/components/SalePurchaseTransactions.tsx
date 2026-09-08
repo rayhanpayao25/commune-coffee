@@ -553,14 +553,15 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                     })
                     .reduce((acc, curr) => acc + curr.usedAmount, 0);
                   const totalUsed = isMatcha ? Math.max(orderUsed, loggedUsed) : loggedUsed;
-                  const packSize = isMatcha ? 150 : 1;
-                  const stockInBaseUnits = s.stock * packSize;
-                  const remainingBaseUnits = Math.max(0, stockInBaseUnits - totalUsed);
-                  const remainingPacks = isMatcha ? remainingBaseUnits / packSize : remainingBaseUnits;
-                  const remainingCups = isMatcha ? remainingBaseUnits / 10 : 0;
                   const totalRestocked = restocks
                     .filter((record) => record.itemName.toLowerCase() === s.name.toLowerCase())
                     .reduce((sum, record) => sum + record.quantityAdded, 0);
+                  const packSize = isMatcha ? 150 : 1;
+                  const totalStock = s.stock + totalRestocked;
+                  const stockInBaseUnits = totalStock * packSize;
+                  const remainingBaseUnits = Math.max(0, stockInBaseUnits - totalUsed);
+                  const remainingPacks = isMatcha ? remainingBaseUnits / packSize : remainingBaseUnits;
+                  const remainingCups = isMatcha ? remainingBaseUnits / 10 : 0;
 
                   return (
                     <tr key={s.id} className="border-b border-neutral-200 text-xs">
