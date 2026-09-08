@@ -529,7 +529,9 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                   <th className="p-3 border-r border-neutral-300">Item Name</th>
                   <th className="p-3 border-r border-neutral-300">Category</th>
                   <th className="p-3 border-r border-neutral-300 text-right">Current Stock</th>
-                  <th className="p-3 border-r border-neutral-300 text-right">Total Used</th>
+                  <th className="p-3 border-r border-neutral-300 text-center">Restock</th>
+                  <th className="p-3 border-r border-neutral-300 text-right">Total Stock</th>
+                  <th className="p-3 border-r border-neutral-300 text-right">Used Stock</th>
                   <th className="p-3 border-r border-neutral-300 text-right">Remaining Stock</th>
                   <th className="p-3 border-r border-neutral-300 text-center">Restock</th>
                   <th className="p-3 text-center">Actions</th>
@@ -556,6 +558,9 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                   const remainingBaseUnits = Math.max(0, stockInBaseUnits - totalUsed);
                   const remainingPacks = isMatcha ? remainingBaseUnits / packSize : remainingBaseUnits;
                   const remainingCups = isMatcha ? remainingBaseUnits / 10 : 0;
+                  const totalRestocked = restocks
+                    .filter((record) => record.itemName.toLowerCase() === s.name.toLowerCase())
+                    .reduce((sum, record) => sum + record.quantityAdded, 0);
 
                   return (
                     <tr key={s.id} className="border-b border-neutral-200 text-xs">
@@ -574,15 +579,22 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                           className="w-24 bg-white border border-neutral-400 rounded px-2 py-1 text-right font-bold"
                         />
                       </td>
+                      <td className="p-3 border-r border-neutral-200 text-right font-semibold">
+                        {isMatcha ? `${totalRestocked} packs` : totalRestocked}
+                      </td>
+                      <td className="p-3 border-r border-neutral-200 text-right font-bold">
+                        {isMatcha ? `${stockInBaseUnits.toFixed(0)} g` : stockInBaseUnits}
+                      </td>
                       <td className="p-2 border-r border-neutral-200 text-right text-red-600 font-medium">
                         <input
-                          aria-label={`Total Used for ${s.name}`}
+                          aria-label={`Used Stock for ${s.name}`}
                           type="number"
                           min="0"
-                          value={isMatcha ? totalUsed : totalUsed}
+                          value={totalUsed}
                           onChange={(e) => handleTotalUsedChange(s.name, e.target.value)}
                           className="w-24 bg-white border border-neutral-400 rounded px-2 py-1 text-right text-red-600 font-medium"
                         />
+                        {isMatcha && <span className="ml-1">g</span>}
                       </td>
                       <td className="p-3 border-r border-neutral-200 text-right font-bold">
                         {isMatcha
