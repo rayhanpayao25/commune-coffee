@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import type { InventoryItem, MenuItem, Order, Promotion, RecipeIngredient, StaffUser, StoreData } from "@/lib/types";
+import type { InventoryItem, MenuItem, Order, Promotion, RecipeIngredient, StaffUser, StoreData, CostingItem } from "@/lib/types";
 import { DEFAULT_MENU, MENU_CATEGORIES } from "@/lib/menu";
 import { parsePayment } from "@/lib/payments";
 import { DEFAULT_PROMOS } from "@/lib/promos";
@@ -112,6 +112,12 @@ const DEFAULT_INVENTORY: InventoryItem[] = [
   { id: "matcha-powder", name: "Matcha Powder", category: "Ingredients", unit: "grams", cost: 450, stock: 500, maxStock: 1000 },
 ];
 
+const DEFAULT_COSTINGS: CostingItem[] = [
+  { id: "cost-coffee-beans", productName: "Coffee Beans", ingredients: [{ name: "Coffee Beans", amount: 1000, unit: "grams", outputCups: 55 }] },
+  { id: "cost-milk", productName: "Milk", ingredients: [{ name: "Milk", amount: 1000, unit: "ml", outputCups: 7.5 }] },
+  { id: "cost-matcha", productName: "Matcha Powder", ingredients: [{ name: "Matcha Powder", amount: 150, unit: "grams", outputCups: 15 }] },
+];
+
 const DEFAULT_RECIPES: Record<string, RecipeIngredient[]> = Object.fromEntries(
   DEFAULT_MENU.map((item) => [item.id, [
     { inventoryItemId: "coffee-beans", name: "Coffee Beans", amount: 18, unit: "grams" },
@@ -132,7 +138,7 @@ function emptyStore(): StoreData {
     recipes: structuredClone(DEFAULT_RECIPES),
     usageLogs: [],
     restocks: [],
-    costings: [],
+    costings: structuredClone(DEFAULT_COSTINGS),
   };
 }
 
