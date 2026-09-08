@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { StoreData } from "@/lib/types";
 
 type TabType = "transactions" | "stock" | "restock" | "costing" | "used";
@@ -118,6 +118,13 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
   });
 
   const [usages, setUsages] = useState<UsageRecord[]>(persistedUsages);
+
+  useEffect(() => {
+    setTransactions(persistedTransactions);
+    setStocks(persistedStocks);
+    setUsages(persistedUsages);
+  }, [store.orders, store.inventory, store.usageLogs]);
+
   const [editTxId, setEditTxId] = useState<string | null>(null);
   const [txProduct, setTxProduct] = useState("");
   const [txType, setTxType] = useState<"Purchase" | "Sale">("Sale");
