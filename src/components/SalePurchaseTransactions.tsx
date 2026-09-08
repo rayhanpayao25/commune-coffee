@@ -681,7 +681,12 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                 </tr>
               </thead>
               <tbody>
-                  {restocks.filter((r) => !selectedDateFilter || r.date.slice(0, 10) === selectedDateFilter).map((r) => (
+                {(() => {
+                  const filteredRestocks = restocks.filter((r) => !selectedDateFilter || r.date.slice(0, 10) === selectedDateFilter);
+                  if (selectedDateFilter && filteredRestocks.length === 0) {
+                    return <tr><td colSpan={4} className="p-8 text-center text-sm text-neutral-500">No restock data for {selectedDateFilter}.</td></tr>;
+                  }
+                  return filteredRestocks.map((r) => (
                   <tr key={r.id} className="border-b border-neutral-200 text-xs">
                     <td className="p-3 border-r border-neutral-200 text-neutral-600 font-medium">{r.date}</td>
                     <td className="p-3 border-r border-neutral-200 font-medium">{r.itemName}</td>
@@ -691,7 +696,8 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                       <button onClick={() => handleDeleteRestock(r.id)} className="text-red-600 hover:underline font-medium text-xs">Delete</button>
                     </td>
                   </tr>
-                ))}
+                                  ))
+                })()}
               </tbody>
             </table>
           </div>
@@ -763,7 +769,12 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                 </tr>
               </thead>
               <tbody>
-                {costings.map((c) => (
+                {(() => {
+                  const hasCostingDataForDate = !selectedDateFilter || store.orders.some((order) => order.createdAt.slice(0, 10) === selectedDateFilter) || restocks.some((record) => record.date.slice(0, 10) === selectedDateFilter) || usages.some((usage) => usage.date.slice(0, 10) === selectedDateFilter);
+                  if (!hasCostingDataForDate) {
+                    return <tr><td colSpan={7} className="p-8 text-center text-sm text-neutral-500">No costing data for {selectedDateFilter}.</td></tr>;
+                  }
+                  return costings.map((c) => (
                   <tr key={c.id} className="border-b border-neutral-200 text-xs">
                     {(() => {
                       const ing = c.ingredients[0];
@@ -773,7 +784,7 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                         return itemName === ingredientName || itemName.includes(ingredientName) || ingredientName.includes(itemName);
                       });
                       const isMatcha = /matcha/i.test(ingredientName) || /matcha powder/i.test(stock?.name ?? "");
-                      const usedFromOrders = store.orders.reduce((sum, order) =>
+                      const usedFromOrders = store.orders.filter((order) => !selectedDateFilter || order.createdAt.slice(0, 10) === selectedDateFilter).reduce((sum, order) =>
                         sum + order.items
                           .filter((item) => /matcha|hojicha/i.test(`${item.name} ${item.productId}`))
                           .reduce((itemSum, item) => itemSum + item.qty * 10, 0),
@@ -782,6 +793,7 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                       const used = isMatcha
                         ? usedFromOrders
                         : usages
+                          .filter((entry) => !selectedDateFilter || entry.date.slice(0, 10) === selectedDateFilter)
                           .filter((entry) => {
                             const entryName = entry.itemName.toLowerCase();
                             return entryName === ingredientName || entryName.includes(ingredientName) || ingredientName.includes(entryName);
@@ -807,7 +819,8 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                       <button onClick={() => handleDeleteCosting(c.id)} className="text-red-600 hover:underline font-medium text-xs">Delete</button>
                     </td>
                   </tr>
-                ))}
+                ))
+                })()}
               </tbody>
             </table>
           </div>
