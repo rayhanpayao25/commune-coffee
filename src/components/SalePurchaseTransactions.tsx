@@ -544,15 +544,21 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                 </tr>
               </thead>
               <tbody>
-                {stocks.map((s) => {
+                {(() => {
+                  const hasSelectedDateData = !selectedDateFilter || store.orders.some((order) => order.createdAt.slice(0, 10) === selectedDateFilter) || restocks.some((record) => record.date.slice(0, 10) === selectedDateFilter) || usages.some((usage) => usage.date.slice(0, 10) === selectedDateFilter);
+                  if (!hasSelectedDateData) {
+                    return <tr><td colSpan={10} className="p-8 text-center text-sm text-neutral-500">No stock data for {selectedDateFilter}.</td></tr>;
+                  }
+                  return stocks.map((s) => {
                   const isMatcha = /matcha/i.test(`${s.name} ${s.category}`);
                   const orderUsed = isMatcha
-                    ? store.orders.filter((order) => !selectedDateFilter || order.createdAt.slice(0, 10) === selectedDateFilter).reduce((sum, order) => sum + order.items
+                    ? store.orders.filter((order) => !selectedDateFilter || order.createdAt.slice(0, 10) <= selectedDateFilter).reduce((sum, order) => sum + order.items
                       .filter((item) => /matcha|hojicha/i.test(`${item.name} ${item.productId}`))
                       .reduce((itemSum, item) => itemSum + item.qty * 10, 0), 0)
                     : 0;
                   const loggedUsed = usages
                     .filter((u) => {
+                      if (selectedDateFilter && u.date.slice(0, 10) > selectedDateFilter) return false;
                       const usageName = u.itemName.toLowerCase();
                       const stockName = s.name.toLowerCase();
                       return usageName === stockName || usageName.includes(stockName) || stockName.includes(usageName);
@@ -560,7 +566,7 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                     .reduce((acc, curr) => acc + curr.usedAmount, 0);
                   const totalUsed = isMatcha ? Math.max(orderUsed, loggedUsed) : loggedUsed;
                   const totalRestocked = restocks
-                    .filter((record) => record.itemName.toLowerCase() === s.name.toLowerCase())
+                    .filter((record) => record.itemName.toLowerCase() === s.name.toLowerCase() && (!selectedDateFilter || record.date.slice(0, 10) <= selectedDateFilter))
                     .reduce((sum, record) => sum + record.quantityAdded, 0);
                   const packSize = isMatcha ? 150 : 1;
                   const totalStock = s.stock + totalRestocked;
@@ -633,7 +639,7 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                       </td>
                     </tr>
                   );
-                })}
+                })})()}
               </tbody>
             </table>
           </div>
