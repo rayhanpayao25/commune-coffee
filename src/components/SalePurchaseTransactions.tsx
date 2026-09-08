@@ -154,6 +154,26 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
   const [filterKeyword, setFilterKeyword] = useState("");
   const [selectedDateFilter, setSelectedDateFilter] = useState("");
 
+  const handleTotalUsedChange = (itemName: string, value: string) => {
+    const nextTotal = Math.max(0, Number(value) || 0);
+    setUsages((currentUsages) => {
+      const matching = currentUsages.filter((usage) => usage.itemName.toLowerCase() === itemName.toLowerCase());
+      if (matching.length === 0) {
+        return nextTotal === 0
+          ? currentUsages
+          : [{ id: Date.now().toString(), date: getTodayDate(), itemName, usedAmount: nextTotal, unit: "units" }, ...currentUsages];
+      }
+
+      const firstId = matching[0].id;
+      const otherUsageTotal = matching.slice(1).reduce((sum, usage) => sum + usage.usedAmount, 0);
+      return currentUsages.map((usage) =>
+        usage.id === firstId
+          ? { ...usage, usedAmount: Math.max(0, nextTotal - otherUsageTotal) }
+          : usage,
+      );
+    });
+  };
+
   const applyTransactionInventoryEffect = (productName: string, type: "Purchase" | "Sale", quantity: number, dateStr: string, isRevert = false) => {
     setStocks((prevStocks) => {
       const updatedStocks = [...prevStocks];
@@ -516,9 +536,30 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                     <tr key={s.id} className="border-b border-neutral-200 text-xs">
                       <td className="p-3 border-r border-neutral-200 font-medium">{s.name}</td>
                       <td className="p-3 border-r border-neutral-200 text-neutral-600">{s.category}</td>
-                      <td className="p-3 border-r border-neutral-200 text-right font-bold">{s.stock}</td>
-                      <td className="p-3 border-r border-neutral-200 text-right text-red-600 font-medium">{totalUsed}</td>
-                      <td className="p-3 border-r border-neutral-200 text-right font-bold">{s.stock + totalUsed}</td>
+                      <td className="p-2 border-r border-neutral-200 text-right font-bold">
+                        <input
+                          aria-label={`Current Stock for ${s.name}`}
+                          type="number"
+                          min="0"
+                          value={s.stock}
+                          onChange={(e) => {
+                            const nextStock = Math.max(0, Number(e.target.value) || 0);
+                            setStocks((currentStocks) => currentStocks.map((item) => item.id === s.id ? { ...item, stock: nextStock } : item));
+                          }}
+                          className="w-24 bg-white border border-neutral-400 rounded px-2 py-1 text-right font-bold"
+                        />
+                      </td>
+                      <td className="p-2 border-r border-neutral-200 text-right text-red-600 font-medium">
+                        <input
+                          aria-label={`Total Used for ${s.name}`}
+                          type="number"
+                          min="0"
+                          value={totalUsed}
+                          onChange={(e) => handleTotalUsedChange(s.name, e.target.value)}
+                          className="w-24 bg-white border border-neutral-400 rounded px-2 py-1 text-right text-red-600 font-medium"
+                        />
+                      </td>
+                      <td className="p-3 border-r border-neutral-200 text-right font-bold">{Math.max(0, s.stock - totalUsed)}</td>
                       <td className="p-3 border-r border-neutral-200 text-center">
                         <div className="flex items-center justify-center gap-1">
                           <input
