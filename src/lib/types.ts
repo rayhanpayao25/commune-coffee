@@ -98,10 +98,17 @@ export type RestockRecord = {
   date: string;
 };
 
+export type CostingIngredient = {
+  name: string;
+  amount: number;
+  unit: string;
+  outputCups?: number;
+};
+
 export type CostingItem = {
   id: string;
   productName: string;
-  ingredients: { name: string; amount: number; unit: string }[];
+  ingredients: CostingIngredient[];
 };
 
 export type StoreData = {

@@ -28,11 +28,11 @@ type RestockRecord = {
   date: string;
 };
 
-type CostingItem = {
-  id: string;
-  productName: string;
-  ingredients: { name: string; amount: number; unit: string }[];
-};
+  type CostingItem = {
+    id: string;
+    productName: string;
+    ingredients: { name: string; amount: number; unit: string; outputCups?: number }[];
+  };
 
 type UsageRecord = {
   id: string;
@@ -122,8 +122,8 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
 
   const [editCostingId, setEditCostingId] = useState<string | null>(null);
   const [costingProduct, setCostingProduct] = useState("");
-  const [costingIngs, setCostingIngs] = useState<{ name: string; amount: number; unit: string }[]>([
-    { name: "", amount: 0, unit: "" },
+  const [costingIngs, setCostingIngs] = useState<{ name: string; amount: number; unit: string; outputCups?: number }[]>([
+    { name: "", amount: 0, unit: "", outputCups: 0 },
   ]);
 
   const [inlineRestockValues, setInlineRestockValues] = useState<{ [key: string]: string }>({});
@@ -362,7 +362,7 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
       await saveAdminData({ costings: nextCostings });
     }
     setCostingProduct("");
-    setCostingIngs([{ name: "", amount: 0, unit: "" }]);
+    setCostingIngs([{ name: "", amount: 0, unit: "", outputCups: 0 }]);
   };
 
   const handleEditCosting = (c: CostingItem) => {
@@ -678,22 +678,27 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                       updated[idx].amount = Number(e.target.value);
                       setCostingIngs(updated);
                     }} className="w-24 bg-white border border-neutral-400 rounded px-3 py-1.5 text-sm" />
-                    <input type="text" placeholder="Unit" value={ing.unit} onChange={(e) => {
+                      <input type="text" placeholder="Unit" value={ing.unit} onChange={(e) => {
                       const updated = [...costingIngs];
                       updated[idx].unit = e.target.value;
                       setCostingIngs(updated);
                     }} className="w-28 bg-white border border-neutral-400 rounded px-3 py-1.5 text-sm" />
+                    <input type="number" min="0" step="0.01" placeholder="Cups produced" value={ing.outputCups || ""} onChange={(e) => {
+                      const updated = [...costingIngs];
+                      updated[idx].outputCups = Number(e.target.value);
+                      setCostingIngs(updated);
+                    }} className="w-28 bg-white border border-neutral-400 rounded px-3 py-1.5 text-sm" aria-label="Cups produced" />
                     <button type="button" onClick={() => setCostingIngs(costingIngs.filter((_, i) => i !== idx))} className="text-red-600 text-xs px-2">Remove</button>
                   </div>
                 ))}
-                <button type="button" onClick={() => setCostingIngs([...costingIngs, { name: "", amount: 0, unit: "" }])} className="text-xs bg-[#2d7a75] text-white px-3 py-1 rounded">
+                <button type="button" onClick={() => setCostingIngs([...costingIngs, { name: "", amount: 0, unit: "", outputCups: 0 }])} className="text-xs bg-[#2d7a75] text-white px-3 py-1 rounded">
                   + Add Ingredient
                 </button>
               </div>
 
               <div className="flex gap-2 pt-2">
                 <button type="submit" className="bg-[#1b5e5a] text-white px-4 py-1.5 rounded text-sm font-medium">{editCostingId ? "Update Costing" : "Save Costing"}</button>
-                <button type="button" onClick={() => { setEditCostingId(null); setCostingProduct(""); setCostingIngs([{ name: "", amount: 0, unit: "" }]); }} className="bg-[#2d7a75] text-white px-4 py-1.5 rounded text-sm font-medium">Clear</button>
+                <button type="button" onClick={() => { setEditCostingId(null); setCostingProduct(""); setCostingIngs([{ name: "", amount: 0, unit: "", outputCups: 0 }]); }} className="bg-[#2d7a75] text-white px-4 py-1.5 rounded text-sm font-medium">Clear</button>
               </div>
             </form>
           </div>
@@ -712,9 +717,19 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                   <tr key={c.id} className="border-b border-neutral-200 text-xs">
                     <td className="p-3 border-r border-neutral-200 font-medium">{c.productName}</td>
                     <td className="p-3 border-r border-neutral-200 text-neutral-600">
-                      {c.ingredients.map((ing, i) => (
-                        <div key={i}>• {ing.name}: {ing.amount} {ing.unit}</div>
-                      ))}
+                      {c.ingredients.map((ing, i) => {
+                        const stock = stocks.find((item) => item.name.toLowerCase() === ing.name.toLowerCase());
+                        const cups = stock && ing.amount > 0 && ing.outputCups
+                          ? (stock.stock / ing.amount) * ing.outputCups
+                          : null;
+                        return (
+                          <div key={i}>
+                            • {ing.name}: {ing.amount} {ing.unit}
+                            {ing.outputCups ? ` → ${ing.outputCups} cups` : ""}
+                            {cups !== null ? ` | Available yield: ${cups.toFixed(2)} cups` : ""}
+                          </div>
+                        );
+                      })}
                     </td>
                     <td className="p-3 text-center space-x-2">
                       <button onClick={() => handleEditCosting(c)} className="text-blue-600 hover:underline font-medium text-xs">Edit</button>
