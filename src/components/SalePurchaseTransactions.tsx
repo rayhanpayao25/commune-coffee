@@ -708,10 +708,10 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
               <thead>
                 <tr className="bg-[#b5d6d8] border-b border-neutral-400 text-neutral-800 text-xs font-semibold">
                   <th className="p-3 border-r border-neutral-300">Item</th>
-                  <th className="p-3 border-r border-neutral-300">Stock</th>
-                  <th className="p-3 border-r border-neutral-300">Used</th>
-                  <th className="p-3 border-r border-neutral-300">Available</th>
                   <th className="p-3 border-r border-neutral-300">Cups</th>
+                  <th className="p-3 border-r border-neutral-300">Used</th>
+                  <th className="p-3 border-r border-neutral-300">Stock</th>
+                  <th className="p-3 border-r border-neutral-300">Available</th>
                   <th className="p-3 text-center">Actions</th>
                 </tr>
               </thead>
@@ -720,17 +720,27 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                   <tr key={c.id} className="border-b border-neutral-200 text-xs">
                     {(() => {
                       const ing = c.ingredients[0];
-                      const stock = stocks.find((item) => item.name.toLowerCase() === ing?.name.toLowerCase());
-                      const used = usages.filter((entry) => entry.itemName.toLowerCase() === ing?.name.toLowerCase()).reduce((sum, entry) => sum + entry.usedAmount, 0);
+                      const ingredientName = ing?.name.toLowerCase() ?? "";
+                      const stock = stocks.find((item) => {
+                        const itemName = item.name.toLowerCase();
+                        return itemName === ingredientName || itemName.includes(ingredientName) || ingredientName.includes(itemName);
+                      });
+                      const used = usages
+                        .filter((entry) => {
+                          const entryName = entry.itemName.toLowerCase();
+                          return entryName === ingredientName || entryName.includes(ingredientName) || ingredientName.includes(entryName);
+                        })
+                        .reduce((sum, entry) => sum + entry.usedAmount, 0);
                       const currentStock = stock?.stock ?? 0;
                       const available = Math.max(0, currentStock - used);
+                      const cupsUsed = ing && ing.amount > 0 && ing.outputCups ? (used / ing.amount) * ing.outputCups : 0;
                       const cups = ing && ing.amount > 0 && ing.outputCups ? (available / ing.amount) * ing.outputCups : 0;
                       return <>
                         <td className="p-3 border-r border-neutral-200 font-medium">{c.productName}</td>
-                        <td className="p-3 border-r border-neutral-200">{currentStock} {ing?.unit}</td>
+                        <td className="p-3 border-r border-neutral-200 font-semibold">{cupsUsed.toFixed(2)}</td>
                         <td className="p-3 border-r border-neutral-200 text-red-600">{used} {ing?.unit}</td>
-                        <td className="p-3 border-r border-neutral-200 font-semibold">{available} {ing?.unit}</td>
-                        <td className="p-3 border-r border-neutral-200 font-semibold">{cups.toFixed(2)}</td>
+                        <td className="p-3 border-r border-neutral-200">{currentStock} {ing?.unit}</td>
+                        <td className="p-3 border-r border-neutral-200 font-semibold">{available} {ing?.unit} ({cups.toFixed(2)} cups)</td>
                       </>;
                     })()}
                     <td className="p-3 text-center space-x-2">
