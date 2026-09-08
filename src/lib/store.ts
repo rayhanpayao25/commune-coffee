@@ -10,12 +10,26 @@ const STORE_STATE_ID = "commune-coffee";
 let queue: Promise<unknown> = Promise.resolve();
 
 function supabaseAdmin() {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url =
+    process.env.SUPABASE_URL ??
+    process.env.NEXT_PUBLIC_SUPABASE_URL ??
+    process.env.commume_coffee_SUPABASE_URL ??
+    process.env.NEXT_PUBLIC_commume_coffee_SUPABASE_URL;
+  const key =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ??
+    process.env.SUPABASE_SECRET_KEY ??
+    process.env.commume_coffee_SUPABASE_SERVICE_ROLE_KEY ??
+    process.env.commume_coffee_SUPABASE_SECRET_KEY;
+
   if (!url || !key) {
-    throw new Error("Supabase server credentials are not configured.");
+    throw new Error(
+      "Supabase server credentials are not configured. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to your local .env.local file.",
+    );
   }
-  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+
+  return createClient(url, key, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
 }
 
 function seedOrders(): Order[] {
