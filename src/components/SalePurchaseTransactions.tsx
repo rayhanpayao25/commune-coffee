@@ -537,9 +537,25 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
               </thead>
               <tbody>
                 {stocks.map((s) => {
-                  const totalUsed = usages
-                    .filter((u) => u.itemName.toLowerCase() === s.name.toLowerCase())
+                  const isMatcha = /matcha/i.test(`${s.name} ${s.category}`);
+                  const orderUsed = isMatcha
+                    ? store.orders.reduce((sum, order) => sum + order.items
+                      .filter((item) => /matcha|hojicha/i.test(`${item.name} ${item.productId}`))
+                      .reduce((itemSum, item) => itemSum + item.qty * 10, 0), 0)
+                    : 0;
+                  const loggedUsed = usages
+                    .filter((u) => {
+                      const usageName = u.itemName.toLowerCase();
+                      const stockName = s.name.toLowerCase();
+                      return usageName === stockName || usageName.includes(stockName) || stockName.includes(usageName);
+                    })
                     .reduce((acc, curr) => acc + curr.usedAmount, 0);
+                  const totalUsed = isMatcha ? Math.max(orderUsed, loggedUsed) : loggedUsed;
+                  const packSize = isMatcha ? 150 : 1;
+                  const stockInBaseUnits = s.stock * packSize;
+                  const remainingBaseUnits = Math.max(0, stockInBaseUnits - totalUsed);
+                  const remainingPacks = isMatcha ? remainingBaseUnits / packSize : remainingBaseUnits;
+                  const remainingCups = isMatcha ? remainingBaseUnits / 10 : 0;
 
                   return (
                     <tr key={s.id} className="border-b border-neutral-200 text-xs">
@@ -563,12 +579,16 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                           aria-label={`Total Used for ${s.name}`}
                           type="number"
                           min="0"
-                          value={totalUsed}
+                          value={isMatcha ? totalUsed : totalUsed}
                           onChange={(e) => handleTotalUsedChange(s.name, e.target.value)}
                           className="w-24 bg-white border border-neutral-400 rounded px-2 py-1 text-right text-red-600 font-medium"
                         />
                       </td>
-                      <td className="p-3 border-r border-neutral-200 text-right font-bold">{Math.max(0, s.stock - totalUsed)}</td>
+                      <td className="p-3 border-r border-neutral-200 text-right font-bold">
+                        {isMatcha
+                          ? `${remainingPacks.toFixed(2)} packs (${remainingBaseUnits.toFixed(0)} g; ${remainingCups.toFixed(0)} cups)`
+                          : remainingBaseUnits}
+                      </td>
                       <td className="p-3 border-r border-neutral-200 text-center">
                         <div className="flex items-center justify-center gap-1">
                           <input
