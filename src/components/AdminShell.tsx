@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { UserManager } from "@/components/UserManager";
 import { StockAndUsageExample } from "@/components/StockAndUsageExample";
 import { SalePurchaseTransactions } from "@/components/SalePurchaseTransactions";
@@ -19,6 +20,13 @@ type AdminShellProps = {
 export function AdminShell({ session, users, store, children }: AdminShellProps) {
   const [panel, setPanel] = useState<PanelType>("sales");
   const [isMounted, setIsMounted] = useState(false);
+  const router = useRouter();
+
+  useEffect(() => {
+    if (panel !== "transactions") return;
+    const refreshTimer = window.setInterval(() => router.refresh(), 5000);
+    return () => window.clearInterval(refreshTimer);
+  }, [panel, router]);
 
   // Basahin ang localStorage pagka-load sa browser para maalala ang huling binuksang tab
   useEffect(() => {
