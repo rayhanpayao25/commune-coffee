@@ -760,9 +760,10 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                             return entryName === ingredientName || entryName.includes(ingredientName) || ingredientName.includes(entryName);
                           })
                           .reduce((sum, entry) => sum + entry.usedAmount, 0);
+                      const packSize = isMatcha ? 150 : 1;
                       const remainingStock = stock?.stock ?? 0;
-                      const currentStock = remainingStock + used;
-                      const available = remainingStock;
+                      const currentStock = remainingStock * packSize + used;
+                      const available = Math.max(0, currentStock - used);
                       const cupsUsed = ing && ing.amount > 0 && ing.outputCups ? (used / ing.amount) * ing.outputCups : 0;
                       const cups = ing && ing.amount > 0 && ing.outputCups ? (available / ing.amount) * ing.outputCups : 0;
                       return <>
