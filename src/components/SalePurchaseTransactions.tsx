@@ -725,14 +725,24 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                         const itemName = item.name.toLowerCase();
                         return itemName === ingredientName || itemName.includes(ingredientName) || ingredientName.includes(itemName);
                       });
-                      const used = usages
-                        .filter((entry) => {
-                          const entryName = entry.itemName.toLowerCase();
-                          return entryName === ingredientName || entryName.includes(ingredientName) || ingredientName.includes(entryName);
-                        })
-                        .reduce((sum, entry) => sum + entry.usedAmount, 0);
-                      const currentStock = stock?.stock ?? 0;
-                      const available = Math.max(0, currentStock - used);
+                      const isMatcha = /matcha/i.test(ingredientName) || /matcha powder/i.test(stock?.name ?? "");
+                      const usedFromOrders = store.orders.reduce((sum, order) =>
+                        sum + order.items
+                          .filter((item) => /matcha|hojicha/i.test(`${item.name} ${item.productId}`))
+                          .reduce((itemSum, item) => itemSum + item.qty * 10, 0),
+                        0,
+                      );
+                      const used = isMatcha
+                        ? usedFromOrders
+                        : usages
+                          .filter((entry) => {
+                            const entryName = entry.itemName.toLowerCase();
+                            return entryName === ingredientName || entryName.includes(ingredientName) || ingredientName.includes(entryName);
+                          })
+                          .reduce((sum, entry) => sum + entry.usedAmount, 0);
+                      const remainingStock = stock?.stock ?? 0;
+                      const currentStock = remainingStock + used;
+                      const available = remainingStock;
                       const cupsUsed = ing && ing.amount > 0 && ing.outputCups ? (used / ing.amount) * ing.outputCups : 0;
                       const cups = ing && ing.amount > 0 && ing.outputCups ? (available / ing.amount) * ing.outputCups : 0;
                       return <>
