@@ -66,16 +66,45 @@ export async function createOrder(
 
     for (const line of cart) {
       const menuItem = store.menu.find((item) => item.id === line.productId);
+      const qty = Number(line.qty);
       if (!menuItem || !menuItem.available) {
         error = "One of the items is no longer on the menu.";
+        return;
+      }
+      if (!Number.isSafeInteger(qty) || qty < 1 || qty > 99) {
+        error = "Each item quantity must be a whole number from 1 to 99.";
         return;
       }
       priced.push({
         productId: menuItem.id,
         name: menuItem.name,
-        qty: Math.max(1, Math.floor(line.qty)),
+        qty,
         price: menuItem.price,
       });
+    }
+
+    const requestedStock = new Map<string, number>();
+    for (const line of priced) {
+      for (const ingredient of store.recipes[line.productId] ?? []) {
+        const inventory = store.inventory.find(
+          (item) =>
+            item.id === ingredient.inventoryItemId ||
+            item.name.toLowerCase() === ingredient.name.toLowerCase(),
+        );
+        if (inventory) {
+          requestedStock.set(
+            inventory.id,
+            (requestedStock.get(inventory.id) ?? 0) + ingredient.amount * line.qty,
+          );
+        }
+      }
+    }
+    for (const [inventoryId, requested] of requestedStock) {
+      const inventory = store.inventory.find((item) => item.id === inventoryId);
+      if (inventory && inventory.stock < requested) {
+        error = `Not enough ${inventory.name} in stock.`;
+        return;
+      }
     }
 
     const subtotal = priced.reduce((sum, item) => sum + item.price * item.qty, 0);
