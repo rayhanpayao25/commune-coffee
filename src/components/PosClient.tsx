@@ -146,7 +146,7 @@ export function PosClient({
   function currentTicket(): ReceiptTicket {
     return {
       ticketNo: nextTicketNo(orders),
-      barsita: session.name,
+      barista: session.name,
       items: cart,
       subtotal,
       discount,
