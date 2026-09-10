@@ -5,7 +5,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { SocialLinks } from "@/components/SocialLinks";
 import { CAFE } from "@/lib/cafe";
 import { DEFAULT_MENU, formatMoney } from "@/lib/menu";
-import type { MenuItem, Session } from "@/lib/types";
+import type { MenuItem } from "@/lib/types";
 
 function Eyebrow({ children }: { children: string }) {
   return (
@@ -43,10 +43,8 @@ function Photo({
 }
 
 export function LandingPage({
-  session,
   menu = DEFAULT_MENU,
 }: {
-  session: Session | null;
   menu?: MenuItem[];
 }) {
   const bestSellers = menu
@@ -66,7 +64,7 @@ export function LandingPage({
           className="object-cover object-center"
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/35 via-transparent to-black/70" />
-        <SiteNav session={session} />
+        <SiteNav />
         <div className="relative z-10 flex min-h-svh flex-col items-center justify-end px-5 pb-10 text-center sm:px-6 sm:pb-16">
           <p className="font-script text-2xl text-white/90 sm:text-4xl">
             have a seat, take a sip
