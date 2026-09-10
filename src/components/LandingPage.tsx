@@ -20,13 +20,13 @@ function Photo({
   alt,
   className,
   sizes,
-  priority = false,
+  loading,
 }: {
   src: string;
   alt: string;
   className?: string;
   sizes: string;
-  priority?: boolean;
+  loading?: "eager" | "lazy";
 }) {
   return (
     <article className={`group relative overflow-hidden bg-neutral-900 ${className ?? ""}`}>
@@ -34,7 +34,7 @@ function Photo({
         src={src}
         alt={alt}
         fill
-        priority={priority}
+        loading={loading}
         sizes={sizes}
         className="object-cover transition duration-700 ease-out group-hover:scale-[1.04]"
       />
@@ -60,9 +60,8 @@ export function LandingPage({
           src="/images/hero-wide.jpg"
           alt="commune cafe bar"
           fill
-          priority
+          loading="eager"
           quality={95}
-          unoptimized
           sizes="100vw"
           className="object-cover object-center"
         />
@@ -133,7 +132,7 @@ export function LandingPage({
             sizes="(max-width: 768px) 100vw, 50vw"
           />
           <Photo
-            src="/images/"
+            src="/images/signatures.jpg"
             alt="Sea salt cream, Spanish latte, and brownie"
             className="min-h-[260px] sm:min-h-[440px] md:min-h-[520px]"
             sizes="(max-width: 768px) 100vw, 50vw"
@@ -298,6 +297,7 @@ export function LandingPage({
           <Photo
             src="/images/open-now.jpg"
             alt="We're open now at commune"
+            loading="eager"
             className="min-h-[220px] sm:min-h-[360px] lg:col-span-4 lg:min-h-[560px]"
             sizes="(max-width: 1024px) 100vw, 33vw"
           />

@@ -240,8 +240,37 @@ function normalizeStore(store: StoreData): StoreData {
   return store;
 }
 
-export function usesBlobStorage() {
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID);
+const MENU_PHOTO_BUCKET = "menu-photos";
+
+export async function uploadPublicMenuPhoto(
+  filename: string,
+  bytes: Buffer,
+  contentType: string,
+) {
+  const supabase = supabaseAdmin();
+  const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+  if (listError) {
+    throw new Error(`Unable to list storage buckets: ${listError.message}`);
+  }
+
+  if (!buckets?.some((bucket) => bucket.name === MENU_PHOTO_BUCKET)) {
+    const { error } = await supabase.storage.createBucket(MENU_PHOTO_BUCKET, {
+      public: true,
+    });
+    if (error && !/already exists/i.test(error.message)) {
+      throw new Error(`Unable to create photo bucket: ${error.message}`);
+    }
+  }
+
+  const { error } = await supabase.storage
+    .from(MENU_PHOTO_BUCKET)
+    .upload(filename, bytes, { contentType, upsert: false });
+  if (error) {
+    throw new Error(`Unable to upload photo: ${error.message}`);
+  }
+
+  const { data } = supabase.storage.from(MENU_PHOTO_BUCKET).getPublicUrl(filename);
+  return data.publicUrl;
 }
 
 async function readStore(): Promise<StoreData> {

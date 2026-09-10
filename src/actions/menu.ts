@@ -1,12 +1,9 @@
 "use server";
 
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { put } from "@vercel/blob";
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth";
 import { menuItemId } from "@/lib/menu";
-import { updateStore, usesBlobStorage } from "@/lib/store";
+import { updateStore, uploadPublicMenuPhoto } from "@/lib/store";
 
 const PHOTO_TYPES: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -34,7 +31,7 @@ function isSafeImage(src: string) {
   return (
     src.startsWith("/images/") ||
     src.startsWith("/uploads/menu/") ||
-    src.includes(".blob.vercel-storage.com/")
+    src.includes(".supabase.co/storage/")
   );
 }
 
@@ -55,19 +52,14 @@ async function saveMenuPhoto(file: File, id: string) {
   const filename = `${safeId}-${Date.now().toString(36)}.${ext}`;
   const bytes = Buffer.from(await file.arrayBuffer());
 
-  if (usesBlobStorage()) {
-    const blob = await put(`uploads/menu/${filename}`, bytes, {
-      access: "public",
-      addRandomSuffix: false,
-      contentType: file.type,
-    });
-    return { src: blob.url };
+  try {
+    const src = await uploadPublicMenuPhoto(filename, bytes, file.type);
+    return { src };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Could not upload photo.",
+    };
   }
-
-  const dir = path.join(process.cwd(), "public", "uploads", "menu");
-  await mkdir(dir, { recursive: true });
-  await writeFile(path.join(dir, filename), bytes);
-  return { src: `/uploads/menu/${filename}` };
 }
 
 function photoFromForm(formData: FormData) {
