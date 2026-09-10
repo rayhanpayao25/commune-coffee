@@ -90,7 +90,7 @@ export function UserManager({ users, session }: UserManagerProps) {
 
   return (
     <div className="min-h-screen bg-neutral-50/30 w-full">
-      <div className="flex border-b border-neutral-200 bg-white px-6 gap-8 text-sm w-full">
+      <div className="flex w-full gap-4 overflow-x-auto border-b border-neutral-200 bg-white px-4 text-sm sm:gap-8 sm:px-6">
         {(
           [
             { id: "manage", label: "Manage User" },
@@ -109,7 +109,7 @@ export function UserManager({ users, session }: UserManagerProps) {
                 resetForm();
               }
             }}
-            className={`py-3 font-medium transition-all relative ${
+            className={`relative shrink-0 py-3 font-medium whitespace-nowrap transition-all ${
               activeSubTab === tab.id
                 ? "text-neutral-900 border-b-2 border-neutral-900 -mb-px"
                 : "text-neutral-400 hover:text-neutral-600"
@@ -120,7 +120,7 @@ export function UserManager({ users, session }: UserManagerProps) {
         ))}
       </div>
 
-      <div className="w-full px-6 py-8">
+      <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
         {(activeSubTab === "manage" || activeSubTab === "add") && (
           <div className="space-y-6 w-full">
             <div>
@@ -131,7 +131,7 @@ export function UserManager({ users, session }: UserManagerProps) {
 
             {(activeSubTab === "add" || (editingId !== null && editingId !== "new")) ? (
               <form
-                className="space-y-4 border border-neutral-200 bg-white p-6 rounded-2xl shadow-sm transition-all w-full"
+                className="space-y-4 border border-neutral-200 bg-white p-4 rounded-2xl shadow-sm transition-all w-full sm:p-6"
                 onSubmit={(event) => {
                   event.preventDefault();
                   startTransition(async () => {
@@ -290,7 +290,7 @@ export function UserManager({ users, session }: UserManagerProps) {
               {users.map((user) => (
                 <div
                   key={user.id}
-                  className="flex items-center justify-between px-6 py-4 hover:bg-neutral-50/50 transition-all"
+                  className="flex items-center justify-between gap-3 px-4 py-4 transition-all hover:bg-neutral-50/50 sm:px-6"
                 >
                   <div className="min-w-0 flex-1 pr-4">
                     <div className="flex items-center gap-2">
@@ -384,7 +384,7 @@ export function UserManager({ users, session }: UserManagerProps) {
                 setManualTime("");
                 setManualDate("");
               }}
-              className="bg-white border border-neutral-200 p-6 rounded-2xl shadow-sm space-y-4 w-full"
+              className="bg-white border border-neutral-200 p-4 rounded-2xl shadow-sm space-y-4 w-full sm:p-6"
             >
               <p className="text-xs font-semibold tracking-wider text-neutral-400 uppercase border-b border-neutral-100 pb-3">
                 Add Manual Time Log
@@ -458,8 +458,8 @@ export function UserManager({ users, session }: UserManagerProps) {
                   <p className="p-6 text-center text-xs text-neutral-400">No time logs available.</p>
                 ) : (
                   inOutRecords.map((record) => (
-                    <div key={record.id} className="flex items-center justify-between px-6 py-4 text-sm">
-                      <div>
+                    <div key={record.id} className="flex flex-col gap-2 px-4 py-4 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                      <div className="min-w-0">
                         <span className="font-semibold text-neutral-900">{record.staffName}</span>
                         <span className="mx-2 text-neutral-300">·</span>
                         <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${
@@ -468,7 +468,7 @@ export function UserManager({ users, session }: UserManagerProps) {
                           {record.type}
                         </span>
                       </div>
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center justify-between gap-4 sm:justify-end">
                         <span className="text-xs text-neutral-500 font-medium">
                           {record.date} at {record.time}
                         </span>

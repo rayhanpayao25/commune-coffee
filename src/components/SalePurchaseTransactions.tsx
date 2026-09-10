@@ -390,13 +390,13 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
   });
 
   return (
-    <div className="p-6 space-y-6 bg-[#e2f1f2] min-h-screen rounded-xl border border-neutral-300">
-      <div className="flex flex-wrap gap-2 border-b border-neutral-400 pb-3">
+    <div className="min-h-screen min-w-0 space-y-6 rounded-none border-0 border-neutral-300 bg-[#e2f1f2] p-3 sm:rounded-xl sm:border sm:p-6">
+      <div className="flex gap-2 overflow-x-auto border-b border-neutral-400 pb-3">
         {(["transactions", "stock", "restock", "costing", "used"] as TabType[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-1.5 rounded text-xs font-bold transition shadow-sm uppercase ${activeTab === tab ? "bg-[#1b5e5a] text-white" : "bg-white text-neutral-700 hover:bg-neutral-100"}`}
+            className={`shrink-0 px-4 py-1.5 rounded text-xs font-bold transition shadow-sm uppercase ${activeTab === tab ? "bg-[#1b5e5a] text-white" : "bg-white text-neutral-700 hover:bg-neutral-100"}`}
           >
             {tab === "transactions" ? "Transactions" : tab === "stock" ? "Stock Inventory" : tab === "restock" ? "Restock" : tab === "costing" ? "Costing" : "Usage Logbook"}
           </button>
@@ -454,14 +454,14 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                 <option value="Purchase">Purchase</option>
               </select>
             </div>
-            <div className="flex items-center gap-2 flex-1">
-              <span className="text-xs text-neutral-600">Search:</span>
-              <input type="text" placeholder="Search product..." value={filterKeyword} onChange={(e) => setFilterKeyword(e.target.value)} className="bg-white border border-neutral-400 rounded px-2 py-1 text-xs flex-1 max-w-xs" />
+            <div className="flex min-w-0 w-full items-center gap-2 sm:flex-1">
+              <span className="shrink-0 text-xs text-neutral-600">Search:</span>
+              <input type="text" placeholder="Search product..." value={filterKeyword} onChange={(e) => setFilterKeyword(e.target.value)} className="min-w-0 flex-1 bg-white border border-neutral-400 rounded px-2 py-1 text-xs sm:max-w-xs" />
             </div>
           </div>
 
-          <div className="border border-neutral-400 rounded-lg overflow-hidden bg-white shadow-sm">
-            <table className="w-full text-left border-collapse text-sm">
+          <div className="overflow-x-auto rounded-lg border border-neutral-400 bg-white shadow-sm">
+            <table className="w-full min-w-[720px] border-collapse text-left text-sm">
               <thead>
                 <tr className="bg-[#b5d6d8] border-b border-neutral-400 text-neutral-800 font-semibold text-xs">
                   <th className="p-3 border-r border-neutral-300">Date</th>
@@ -500,7 +500,7 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
 
       {activeTab === "stock" && (
         <div className="space-y-6">
-          <div className="flex items-center gap-3 bg-[#d1e8e9] p-3 rounded-lg border border-neutral-400 text-sm">
+          <div className="flex flex-wrap gap-3 bg-[#d1e8e9] p-3 rounded-lg border border-neutral-400 text-sm">
             <label className="text-xs text-neutral-600">Filter date:</label>
             <input type="date" value={selectedDateFilter} onChange={(e) => setSelectedDateFilter(e.target.value)} className="bg-white border border-neutral-400 rounded px-2 py-1 text-xs" />
             {selectedDateFilter && <button onClick={() => setSelectedDateFilter("")} className="text-xs text-blue-600 underline">Reset</button>}
@@ -527,8 +527,8 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
             </form>
           </div>
 
-          <div className="border border-neutral-400 rounded-lg overflow-hidden bg-white">
-            <table className="w-full text-left text-sm">
+          <div className="overflow-x-auto rounded-lg border border-neutral-400 bg-white">
+            <table className="w-full min-w-[1100px] text-left text-sm">
               <thead>
                 <tr className="bg-[#b5d6d8] border-b border-neutral-400 text-neutral-800 text-xs font-semibold">
                   <th className="p-3 border-r border-neutral-300">Date</th>
@@ -718,8 +718,8 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
             </form>
           </div>
 
-          <div className="border border-neutral-400 rounded-lg overflow-hidden bg-white">
-            <table className="w-full text-left text-sm">
+          <div className="overflow-x-auto rounded-lg border border-neutral-400 bg-white">
+            <table className="w-full min-w-[640px] text-left text-sm">
               <thead>
                 <tr className="bg-[#b5d6d8] border-b border-neutral-400 text-neutral-800 text-xs font-semibold">
                   <th className="p-3 border-r border-neutral-300">Date & Time</th>
@@ -767,28 +767,28 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
               <div className="space-y-2">
                 <label className="block text-xs font-medium text-neutral-600">Ingredients Deducted per 1 Cup/Servings:</label>
                 {costingIngs.map((ing, idx) => (
-                  <div key={idx} className="flex gap-2 items-center">
+                  <div key={idx} className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
                     <input type="text" placeholder="Ingredient Name (e.g. Coffee Beans)" value={ing.name} onChange={(e) => {
                       const updated = [...costingIngs];
                       updated[idx].name = e.target.value;
                       setCostingIngs(updated);
-                    }} className="flex-1 bg-white border border-neutral-400 rounded px-3 py-1.5 text-sm" />
+                    }} className="col-span-2 flex-1 bg-white border border-neutral-400 rounded px-3 py-1.5 text-sm" />
                     <input type="number" placeholder="Amount" value={ing.amount || ""} onChange={(e) => {
                       const updated = [...costingIngs];
                       updated[idx].amount = Number(e.target.value);
                       setCostingIngs(updated);
-                    }} className="w-24 bg-white border border-neutral-400 rounded px-3 py-1.5 text-sm" />
+                    }} className="w-full sm:w-24 bg-white border border-neutral-400 rounded px-3 py-1.5 text-sm" />
                       <input type="text" placeholder="Unit" value={ing.unit} onChange={(e) => {
                       const updated = [...costingIngs];
                       updated[idx].unit = e.target.value;
                       setCostingIngs(updated);
-                    }} className="w-28 bg-white border border-neutral-400 rounded px-3 py-1.5 text-sm" />
+                    }} className="w-full sm:w-28 bg-white border border-neutral-400 rounded px-3 py-1.5 text-sm" />
                     <input type="number" min="0" step="0.01" placeholder="Cups produced" value={ing.outputCups || ""} onChange={(e) => {
                       const updated = [...costingIngs];
                       updated[idx].outputCups = Number(e.target.value);
                       setCostingIngs(updated);
-                    }} className="w-28 bg-white border border-neutral-400 rounded px-3 py-1.5 text-sm" aria-label="Cups produced" />
-                    <button type="button" onClick={() => setCostingIngs(costingIngs.filter((_, i) => i !== idx))} className="text-red-600 text-xs px-2">Remove</button>
+                    }} className="w-full sm:w-28 bg-white border border-neutral-400 rounded px-3 py-1.5 text-sm" aria-label="Cups produced" />
+                    <button type="button" onClick={() => setCostingIngs(costingIngs.filter((_, i) => i !== idx))} className="text-red-600 text-xs px-2 py-1.5 text-left sm:text-center">Remove</button>
                   </div>
                 ))}
                 <button type="button" onClick={() => setCostingIngs([...costingIngs, { name: "", amount: 0, unit: "", outputCups: 0 }])} className="text-xs bg-[#2d7a75] text-white px-3 py-1 rounded">
@@ -803,8 +803,8 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
             </form>
           </div>
 
-          <div className="border border-neutral-400 rounded-lg overflow-hidden bg-white">
-            <table className="w-full text-left text-sm">
+          <div className="overflow-x-auto rounded-lg border border-neutral-400 bg-white">
+            <table className="w-full min-w-[800px] text-left text-sm">
               <thead>
                 <tr className="bg-[#b5d6d8] border-b border-neutral-400 text-neutral-800 text-xs font-semibold">
                   <th className="p-3 border-r border-neutral-300">Date</th>
@@ -877,8 +877,8 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
 
       {activeTab === "used" && (
         <div className="space-y-6">
-          <div className="border border-neutral-400 rounded-lg overflow-hidden bg-white">
-            <table className="w-full text-left text-sm">
+          <div className="overflow-x-auto rounded-lg border border-neutral-400 bg-white">
+            <table className="w-full min-w-[520px] text-left text-sm">
               <thead>
                 <tr className="bg-[#b5d6d8] border-b border-neutral-400 text-neutral-800 text-xs font-semibold">
                   <th className="p-3 border-r border-neutral-300">Date</th>

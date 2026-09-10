@@ -42,12 +42,12 @@ function Metric({
   hint?: string | null;
 }) {
   return (
-    <div className="border border-neutral-200 bg-white p-5">
-      <p className="text-xs tracking-[0.25em] text-neutral-500 uppercase">
+    <div className="min-w-0 border border-neutral-200 bg-white p-4 sm:p-5">
+      <p className="text-[10px] tracking-[0.2em] text-neutral-500 uppercase sm:text-xs sm:tracking-[0.25em]">
         {label}
       </p>
-      <p className="mt-3 text-2xl font-semibold sm:text-3xl">{value}</p>
-      {hint ? <p className="mt-2 text-xs text-neutral-500">{hint}</p> : null}
+      <p className="mt-2 break-words text-xl font-semibold sm:mt-3 sm:text-3xl">{value}</p>
+      {hint ? <p className="mt-2 text-xs leading-relaxed text-neutral-500">{hint}</p> : null}
     </div>
   );
 }
@@ -396,8 +396,8 @@ export function AdminDashboard({ store }: { store: StoreData }) {
   }
 
   return (
-    <div className="space-y-8 px-4 py-6 sm:space-y-10 sm:px-6 sm:py-8">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+    <div className="space-y-6 px-3 py-5 sm:space-y-10 sm:px-6 sm:py-8">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-xs tracking-[0.3em] text-neutral-500 uppercase">
             Sales analysis
@@ -407,15 +407,15 @@ export function AdminDashboard({ store }: { store: StoreData }) {
           </h1>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center lg:w-auto">
           <div 
-            className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 shadow-sm transition ${
+            className={`flex min-w-0 items-center gap-2 rounded-lg border px-3 py-2 shadow-sm transition sm:py-1.5 ${
               activeFilterMode === "range" 
                 ? "bg-white border-black ring-1 ring-black" 
                 : "bg-white border-neutral-300 opacity-75"
             }`}
           >
-            <span className="text-xs font-medium text-neutral-500">Range:</span>
+            <span className="shrink-0 text-xs font-medium text-neutral-500">Range:</span>
             <select
               value={rangeType}
               onChange={(e) => {
@@ -423,7 +423,7 @@ export function AdminDashboard({ store }: { store: StoreData }) {
                 setActiveFilterMode("range");
               }}
               onClick={() => setActiveFilterMode("range")}
-              className="text-sm bg-transparent outline-none cursor-pointer"
+              className="min-w-0 flex-1 bg-transparent text-sm outline-none cursor-pointer"
             >
               <option value="today">Today</option>
               <option value="week">This Week</option>
@@ -436,13 +436,13 @@ export function AdminDashboard({ store }: { store: StoreData }) {
           </div>
 
           <div 
-            className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 shadow-sm transition ${
+            className={`flex min-w-0 items-center gap-2 rounded-lg border px-3 py-2 shadow-sm transition sm:py-1.5 ${
               activeFilterMode === "date" 
                 ? "bg-white border-black ring-1 ring-black" 
                 : "bg-white border-neutral-300 opacity-75"
             }`}
           >
-            <span className="text-xs font-medium text-neutral-500">Filter Date:</span>
+            <span className="shrink-0 text-xs font-medium text-neutral-500">Date:</span>
             <input
               type="date"
               value={filterDateStr}
@@ -451,12 +451,12 @@ export function AdminDashboard({ store }: { store: StoreData }) {
                 setActiveFilterMode("date");
               }}
               onClick={() => setActiveFilterMode("date")}
-              className="text-sm bg-transparent outline-none cursor-pointer"
+              className="min-w-0 flex-1 bg-transparent text-sm outline-none cursor-pointer"
             />
           </div>
 
           <p
-            className={`rounded-full px-4 py-2 text-sm ${
+            className={`w-fit rounded-full px-4 py-2 text-sm ${
               store.pos.isOpen
                 ? "bg-black text-white"
                 : "border border-neutral-300 text-neutral-600"
@@ -539,17 +539,17 @@ export function AdminDashboard({ store }: { store: StoreData }) {
         </div>
       </section>
 
-      <section className="border border-neutral-200 bg-white p-5">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+      <section className="border border-neutral-200 bg-white p-4 sm:p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-xs tracking-[0.25em] text-neutral-500 uppercase">
+            <p className="text-[10px] tracking-[0.2em] text-neutral-500 uppercase sm:text-xs sm:tracking-[0.25em]">
               Net Summary (Revenue - Expenses - Credits)
             </p>
             <h2 className="mt-2 text-2xl font-semibold sm:text-3xl">
               {formatMoney(netProfitOrLoss)}
             </h2>
           </div>
-          <div className="text-right text-xs text-neutral-500 space-y-1">
+          <div className="text-left text-xs text-neutral-500 space-y-1 sm:text-right">
             <p>Total Revenue: <span className="font-medium text-black">{formatMoney(totalSalesAmount)}</span></p>
             <p>Total Expenses: <span className="font-medium text-black">{formatMoney(totalExpensesAmount)}</span></p>
             <p>Total Credits: <span className="font-medium text-black">{formatMoney(totalCreditsAmount)}</span></p>
@@ -559,9 +559,9 @@ export function AdminDashboard({ store }: { store: StoreData }) {
 
       <section className="grid gap-6 lg:grid-cols-2">
         {!isTodaySelected && (
-          <div className="border border-neutral-200 bg-white p-5">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xs tracking-[0.25em] text-neutral-500 uppercase">
+          <div className="min-w-0 border border-neutral-200 bg-white p-4 sm:p-5">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="text-[10px] tracking-[0.2em] text-neutral-500 uppercase sm:text-xs sm:tracking-[0.25em]">
                 {trackingTitle}
               </h2>
               <span className="text-[11px] text-neutral-400">{trackingSubtitle}</span>
@@ -570,10 +570,10 @@ export function AdminDashboard({ store }: { store: StoreData }) {
           </div>
         )}
 
-        <div className={`border border-neutral-200 bg-white p-5 ${isTodaySelected ? "lg:col-span-2" : ""}`}>
-          <div className="flex items-center justify-between">
-            <h2 className="text-xs tracking-[0.25em] text-neutral-500 uppercase">
-              Peak hours (by item volume) · 11:00 AM – 11:00 PM
+        <div className={`min-w-0 border border-neutral-200 bg-white p-4 sm:p-5 ${isTodaySelected ? "lg:col-span-2" : ""}`}>
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-[10px] tracking-[0.2em] text-neutral-500 uppercase sm:text-xs sm:tracking-[0.25em]">
+              Peak hours <span className="hidden sm:inline">(by item volume) · 11:00 AM – 11:00 PM</span>
             </h2>
             <span className="text-[11px] text-neutral-400">
               {isTodaySelected ? `Today (${todayDateStr})` : "Selected period"}
@@ -596,8 +596,8 @@ export function AdminDashboard({ store }: { store: StoreData }) {
       </section>
 
       <section className="grid gap-6 lg:grid-cols-2">
-        <div className="border border-neutral-200 bg-white p-5">
-          <h2 className="text-xs tracking-[0.25em] text-neutral-500 uppercase">
+        <div className="min-w-0 border border-neutral-200 bg-white p-4 sm:p-5">
+          <h2 className="text-[10px] tracking-[0.2em] text-neutral-500 uppercase sm:text-xs sm:tracking-[0.25em]">
             Best selling drinks
           </h2>
           
@@ -613,8 +613,8 @@ export function AdminDashboard({ store }: { store: StoreData }) {
           />
         </div>
 
-        <div className="border border-neutral-200 bg-white p-5">
-          <h2 className="text-xs tracking-[0.25em] text-neutral-500 uppercase">
+        <div className="min-w-0 border border-neutral-200 bg-white p-4 sm:p-5">
+          <h2 className="text-[10px] tracking-[0.2em] text-neutral-500 uppercase sm:text-xs sm:tracking-[0.25em]">
             Low selling drinks
           </h2>
           <HorizontalBars
@@ -631,8 +631,8 @@ export function AdminDashboard({ store }: { store: StoreData }) {
       </section>
 
       <section className="grid gap-6 lg:grid-cols-3">
-        <div className="border border-neutral-200 bg-white p-5">
-          <h2 className="text-xs tracking-[0.25em] text-neutral-500 uppercase">
+        <div className="min-w-0 border border-neutral-200 bg-white p-4 sm:p-5">
+          <h2 className="text-[10px] tracking-[0.2em] text-neutral-500 uppercase sm:text-xs sm:tracking-[0.25em]">
             Sales by category (by item quantity)
           </h2>
           <p className="mt-1 text-[11px] text-neutral-400">Selected Range</p>
@@ -650,8 +650,8 @@ export function AdminDashboard({ store }: { store: StoreData }) {
           />
         </div>
 
-        <div className="border border-neutral-200 bg-white p-5">
-          <h2 className="text-xs tracking-[0.25em] text-neutral-500 uppercase">
+        <div className="min-w-0 border border-neutral-200 bg-white p-4 sm:p-5">
+          <h2 className="text-[10px] tracking-[0.2em] text-neutral-500 uppercase sm:text-xs sm:tracking-[0.25em]">
             Payment Mix (Total Breakdown)
           </h2>
           <p className="mt-1 text-[11px] text-neutral-400">Total Collections Breakdown</p>
@@ -672,8 +672,8 @@ export function AdminDashboard({ store }: { store: StoreData }) {
           </div>
         </div>
 
-        <div className="border border-neutral-200 bg-white p-5">
-          <h2 className="text-xs tracking-[0.25em] text-neutral-500 uppercase">
+        <div className="min-w-0 border border-neutral-200 bg-white p-4 sm:p-5">
+          <h2 className="text-[10px] tracking-[0.2em] text-neutral-500 uppercase sm:text-xs sm:tracking-[0.25em]">
             Promotions
           </h2>
           <p className="mt-1 text-[11px] text-neutral-400">Selected Range</p>
@@ -698,7 +698,7 @@ export function AdminDashboard({ store }: { store: StoreData }) {
       </section>
 
       <section className="grid gap-6 lg:grid-cols-2">
-        <div className="border border-neutral-200 bg-white p-5 space-y-4">
+        <div className="min-w-0 border border-neutral-200 bg-white p-4 space-y-4 sm:p-5">
           <div className="flex justify-between items-center">
             <div>
               <h2 className="text-xs tracking-[0.25em] text-neutral-500 uppercase">Expenses Tracker</h2>
@@ -771,7 +771,7 @@ export function AdminDashboard({ store }: { store: StoreData }) {
           </div>
         </div>
 
-        <div className="border border-neutral-200 bg-white p-5 space-y-4">
+        <div className="min-w-0 border border-neutral-200 bg-white p-4 space-y-4 sm:p-5">
           <div className="flex justify-between items-center">
             <div>
               <h2 className="text-xs tracking-[0.25em] text-neutral-500 uppercase">Credits</h2>
@@ -845,11 +845,60 @@ export function AdminDashboard({ store }: { store: StoreData }) {
         </div>
       </section>
 
-      <section className="border border-neutral-200 bg-white p-5">
-        <h2 className="text-xs tracking-[0.25em] text-neutral-500 uppercase">
+      <section className="min-w-0 border border-neutral-200 bg-white p-4 sm:p-5">
+        <h2 className="text-[10px] tracking-[0.2em] text-neutral-500 uppercase sm:text-xs sm:tracking-[0.25em]">
           Recent orders
         </h2>
-        <div className="mt-4 overflow-x-auto">
+        <div className="mt-4 space-y-3 md:hidden">
+          {latest.length === 0 ? (
+            <p className="py-6 text-center text-sm text-neutral-500">
+              No recent orders found for the selected range.
+            </p>
+          ) : (
+            latest.map((order: Order, ordIdx: number) => (
+              <article
+                key={`${order.id}-${ordIdx}`}
+                className="rounded-xl border border-neutral-200 p-3"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">
+                      {new Date(order.createdAt).toLocaleString("en-US", {
+                        timeZone: "Asia/Manila",
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: true,
+                      })}
+                    </p>
+                    <p className="mt-0.5 text-xs text-neutral-500">{order.baristaName}</p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="text-sm font-semibold">{formatMoney(order.total)}</p>
+                    <span
+                      className={`mt-1 inline-block rounded px-2 py-0.5 text-[10px] font-medium ${
+                        order.voided
+                          ? "bg-red-100 text-red-700"
+                          : "bg-green-100 text-green-700"
+                      }`}
+                    >
+                      {order.voided ? "Voided" : "Completed"}
+                    </span>
+                  </div>
+                </div>
+                <p className="mt-2 text-xs leading-relaxed text-neutral-600">
+                  {order.items.map((item) => `${item.qty}× ${item.name}`).join(", ")}
+                </p>
+                <p className="mt-2 text-[11px] text-neutral-500">
+                  {paymentLabel(order.paymentMethod)}
+                  {order.promoLabel ? ` · ${order.promoLabel}` : ""}
+                </p>
+              </article>
+            ))
+          )}
+        </div>
+        <div className="mt-4 hidden overflow-x-auto md:block">
           <table className="w-full min-w-[780px] text-left text-sm">
             <thead className="border-b border-neutral-200 text-neutral-500">
               <tr>

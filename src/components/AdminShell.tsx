@@ -73,7 +73,7 @@ export function AdminShell({ session, users, store, children }: AdminShellProps)
         <UserManager users={users} session={session} />
       ) : (
         <>
-          <div className="border-b border-neutral-200 bg-white px-4 py-2 sm:px-6">
+          <div className="border-b border-neutral-200 bg-white px-3 py-2 sm:px-6">
             <div className="flex gap-1 overflow-x-auto">
               {(
                 [
