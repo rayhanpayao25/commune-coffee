@@ -20,5 +20,15 @@ export const CAFE = {
       label: "Facebook",
       href: "https://www.facebook.com/p/commune-caf%C3%A9-61582118725483/",
     },
+    {
+      id: "instagram" as const,
+      label: "Instagram",
+      href: "https://www.instagram.com/commune180",
+    },
+    {
+      id: "tiktok" as const,
+      label: "TikTok",
+      href: "https://www.tiktok.com/@commune.caf",
+    },
   ],
 } as const;
