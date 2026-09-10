@@ -1,5 +1,16 @@
 import { createClient } from "@supabase/supabase-js";
-import type { InventoryItem, MenuItem, Order, Promotion, RecipeIngredient, StaffUser, StoreData, CostingItem } from "@/lib/types";
+import type {
+  CostingItem,
+  InventoryItem,
+  LoginActivity,
+  MenuItem,
+  Order,
+  Promotion,
+  RecipeIngredient,
+  Role,
+  StaffUser,
+  StoreData,
+} from "@/lib/types";
 import { DEFAULT_MENU, MENU_CATEGORIES } from "@/lib/menu";
 import { parsePayment } from "@/lib/payments";
 import { DEFAULT_PROMOS } from "@/lib/promos";
@@ -139,6 +150,7 @@ function emptyStore(): StoreData {
     usageLogs: [],
     restocks: [],
     costings: structuredClone(DEFAULT_COSTINGS),
+    loginActivity: [],
   };
 }
 
@@ -211,6 +223,9 @@ function normalizeStore(store: StoreData): StoreData {
   }
   if (!Array.isArray(store.costings)) {
     store.costings = [];
+  }
+  if (!Array.isArray(store.loginActivity)) {
+    store.loginActivity = [];
   }
 
   const matchaInventory = store.inventory.find((item) => /matcha/i.test(item.name));
@@ -326,6 +341,34 @@ export function updateStore(
     fn(store);
     await writeStore(store);
     return store;
+  });
+}
+
+export async function recordAuthActivity(entry: {
+  userId: string;
+  username: string;
+  name: string;
+  role: Role;
+  type: LoginActivity["type"];
+}) {
+  if (entry.role === "admin") return;
+
+  await updateStore((store) => {
+    if (!Array.isArray(store.loginActivity)) {
+      store.loginActivity = [];
+    }
+    store.loginActivity.unshift({
+      id: `auth-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+      userId: entry.userId,
+      username: entry.username,
+      name: entry.name,
+      role: entry.role,
+      type: entry.type,
+      at: new Date().toISOString(),
+    });
+    if (store.loginActivity.length > 300) {
+      store.loginActivity.length = 300;
+    }
   });
 }
 

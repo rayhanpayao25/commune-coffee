@@ -5,10 +5,11 @@ import { redirect } from "next/navigation";
 import {
   SESSION_COOKIE,
   encodeSession,
+  getSession,
   homeForRole,
   sessionCookieOptions,
 } from "@/lib/auth";
-import { getStore } from "@/lib/store";
+import { getStore, recordAuthActivity } from "@/lib/store";
 import { toSession } from "@/lib/users";
 
 export type LoginState = {
@@ -35,6 +36,13 @@ export async function login(
   }
 
   const session = toSession(user);
+  await recordAuthActivity({
+    userId: user.id,
+    username: user.username,
+    name: user.name,
+    role: user.role,
+    type: "login",
+  });
   const jar = await cookies();
   jar.set(SESSION_COOKIE, encodeSession(session), sessionCookieOptions());
 
@@ -42,6 +50,16 @@ export async function login(
 }
 
 export async function logout() {
+  const session = await getSession();
+  if (session) {
+    await recordAuthActivity({
+      userId: session.userId,
+      username: session.username,
+      name: session.name,
+      role: session.role,
+      type: "logout",
+    });
+  }
   const jar = await cookies();
   jar.delete(SESSION_COOKIE);
   redirect("/login");

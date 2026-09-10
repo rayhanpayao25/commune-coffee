@@ -111,6 +111,16 @@ export type CostingItem = {
   ingredients: CostingIngredient[];
 };
 
+export type LoginActivity = {
+  id: string;
+  userId: string;
+  username: string;
+  name: string;
+  role: Role;
+  type: "login" | "logout";
+  at: string;
+};
+
 export type StoreData = {
   pos: PosState;
   orders: Order[];
@@ -123,4 +133,5 @@ export type StoreData = {
   usageLogs: UsageLog[];
   restocks: RestockRecord[];
   costings: CostingItem[];
+  loginActivity: LoginActivity[];
 };

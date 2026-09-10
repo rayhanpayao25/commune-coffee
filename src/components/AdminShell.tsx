@@ -70,7 +70,11 @@ export function AdminShell({ session, users, store, children }: AdminShellProps)
       />
 
       {isMounted && section === "staff" ? (
-        <UserManager users={users} session={session} />
+        <UserManager
+          users={users}
+          session={session}
+          loginActivity={store.loginActivity ?? []}
+        />
       ) : (
         <>
           <div className="border-b border-neutral-200 bg-white px-3 py-2 sm:px-6">

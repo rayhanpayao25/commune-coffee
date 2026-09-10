@@ -7,7 +7,7 @@ import {
   updateStaffUser,
 } from "@/actions/users";
 import type { PublicStaffUser } from "@/lib/users";
-import type { Session } from "@/lib/types";
+import type { LoginActivity, Session } from "@/lib/types";
 
 const field =
   "w-full rounded-xl border border-neutral-200 bg-neutral-50/50 px-3.5 py-2.5 text-sm text-neutral-900 outline-none transition-all focus:border-neutral-900 focus:bg-white focus:ring-1 focus:ring-neutral-900";
@@ -15,20 +15,13 @@ const field =
 type UserManagerProps = {
   users: PublicStaffUser[];
   session: Session;
+  loginActivity: LoginActivity[];
 };
 
 type SubTab = "manage" | "add" | "activity";
 type StaffRole = "Admin" | "Barista" | "Manager" | "Cashier";
 
-type InOutRecord = {
-  id: string;
-  staffName: string;
-  type: "Clock In" | "Clock Out";
-  time: string;
-  date: string;
-};
-
-export function UserManager({ users, session }: UserManagerProps) {
+export function UserManager({ users, session, loginActivity }: UserManagerProps) {
   const [activeSubTab, setActiveSubTab] = useState<SubTab>("manage");
   const [editingId, setEditingId] = useState<string | "new" | null>(null);
   const [name, setName] = useState("");
@@ -39,15 +32,6 @@ export function UserManager({ users, session }: UserManagerProps) {
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const [inOutRecords, setInOutRecords] = useState<InOutRecord[]>([
-    { id: "1", staffName: "ray123", type: "Clock In", time: "08:00 AM", date: "2026-09-09" },
-  ]);
-  const [manualStaff, setManualStaff] = useState("");
-  const [manualType, setManualType] = useState<"Clock In" | "Clock Out">("Clock In");
-  const [manualTime, setManualTime] = useState("");
-  const [manualDate, setManualDate] = useState("");
-
-  const cashiers = users.filter((user) => user.role === "cashier");
   const editing = users.find((user) => user.id === editingId) ?? null;
 
   function startCreate() {
@@ -358,133 +342,65 @@ export function UserManager({ users, session }: UserManagerProps) {
               <h1 className="mt-1 text-2xl font-bold tracking-tight text-neutral-900 sm:text-3xl">
                 Activity login for cashier
               </h1>
+              <p className="mt-1 text-sm text-neutral-500">
+                Login and logout times for cashiers on the POS.
+              </p>
             </div>
 
-            {cashiers.length === 0 ? (
-              <p className="text-sm text-neutral-500">
-                Add a cashier account in Add Staff to record login activity here.
-              </p>
-            ) : null}
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (!manualStaff || !manualTime || !manualDate) return;
-                setInOutRecords([
-                  {
-                    id: Date.now().toString(),
-                    staffName: manualStaff,
-                    type: manualType,
-                    time: manualTime,
-                    date: manualDate,
-                  },
-                  ...inOutRecords,
-                ]);
-                setManualStaff("");
-                setManualTime("");
-                setManualDate("");
-              }}
-              className="bg-white border border-neutral-200 p-4 rounded-2xl shadow-sm space-y-4 w-full sm:p-6"
-            >
-              <p className="text-xs font-semibold tracking-wider text-neutral-400 uppercase border-b border-neutral-100 pb-3">
-                Add Manual Time Log
-              </p>
-              <div className="grid gap-4 sm:grid-cols-4">
-                <label className="text-xs font-medium text-neutral-600">
-                  <span className="mb-1.5 block">Cashier</span>
-                  <select
-                    value={manualStaff}
-                    onChange={(e) => setManualStaff(e.target.value)}
-                    className={field}
-                    required
-                  >
-                    <option value="">Select cashier...</option>
-                    {cashiers.map((u) => (
-                      <option key={u.id} value={u.username}>
-                        {u.name} ({u.username})
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="text-xs font-medium text-neutral-600">
-                  <span className="mb-1.5 block">Log Type</span>
-                  <select
-                    value={manualType}
-                    onChange={(e) => setManualType(e.target.value as "Clock In" | "Clock Out")}
-                    className={field}
-                  >
-                    <option value="Clock In">Clock In</option>
-                    <option value="Clock Out">Clock Out</option>
-                  </select>
-                </label>
-                <label className="text-xs font-medium text-neutral-600">
-                  <span className="mb-1.5 block">Date</span>
-                  <input
-                    type="date"
-                    value={manualDate}
-                    onChange={(e) => setManualDate(e.target.value)}
-                    className={field}
-                    required
-                  />
-                </label>
-                <label className="text-xs font-medium text-neutral-600">
-                  <span className="mb-1.5 block">Time</span>
-                  <input
-                    type="text"
-                    placeholder="e.g. 08:30 AM"
-                    value={manualTime}
-                    onChange={(e) => setManualTime(e.target.value)}
-                    className={field}
-                    required
-                  />
-                </label>
-              </div>
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  className="rounded-xl bg-neutral-900 px-6 py-2.5 text-xs font-semibold uppercase tracking-wider text-white shadow-sm hover:bg-neutral-800 transition-all"
-                >
-                  Save Entry
-                </button>
-              </div>
-            </form>
-
             <div className="bg-white border border-neutral-200 rounded-2xl overflow-hidden shadow-sm w-full">
-              <div className="px-6 py-3 border-b border-neutral-100 bg-neutral-50/50">
-                <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">Cashier login activity</p>
+              <div className="px-4 py-3 border-b border-neutral-100 bg-neutral-50/50 sm:px-6">
+                <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">
+                  Cashier login activity
+                </p>
               </div>
               <div className="divide-y divide-neutral-100">
-                {inOutRecords.length === 0 ? (
-                  <p className="p-6 text-center text-xs text-neutral-400">No time logs available.</p>
+                {loginActivity.length === 0 ? (
+                  <p className="p-6 text-center text-xs text-neutral-400">
+                    No cashier login or logout yet.
+                  </p>
                 ) : (
-                  inOutRecords.map((record) => (
-                    <div key={record.id} className="flex flex-col gap-2 px-4 py-4 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-6">
-                      <div className="min-w-0">
-                        <span className="font-semibold text-neutral-900">{record.staffName}</span>
-                        <span className="mx-2 text-neutral-300">·</span>
-                        <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${
-                          record.type === "Clock In" ? "bg-emerald-50 text-emerald-700" : "bg-neutral-100 text-neutral-600"
-                        }`}>
-                          {record.type}
+                  loginActivity.map((record) => {
+                    const at = new Date(record.at);
+                    const when = at.toLocaleString("en-US", {
+                      timeZone: "Asia/Manila",
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: true,
+                    });
+                    const isLogin = record.type === "login";
+                    return (
+                      <div
+                        key={record.id}
+                        className="flex flex-col gap-2 px-4 py-4 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-6"
+                      >
+                        <div className="min-w-0">
+                          <span className="font-semibold text-neutral-900">
+                            {record.name}
+                          </span>
+                          <span className="mx-2 text-neutral-300">·</span>
+                          <span className="text-xs text-neutral-400">
+                            {record.username}
+                          </span>
+                          <span className="mx-2 text-neutral-300">·</span>
+                          <span
+                            className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${
+                              isLogin
+                                ? "bg-emerald-50 text-emerald-700"
+                                : "bg-neutral-100 text-neutral-600"
+                            }`}
+                          >
+                            {isLogin ? "Login" : "Logout"}
+                          </span>
+                        </div>
+                        <span className="text-xs font-medium text-neutral-500">
+                          {when}
                         </span>
                       </div>
-                      <div className="flex items-center justify-between gap-4 sm:justify-end">
-                        <span className="text-xs text-neutral-500 font-medium">
-                          {record.date} at {record.time}
-                        </span>
-                        <button
-                          type="button"
-                          aria-label="Delete entry"
-                          onClick={() => setInOutRecords(inOutRecords.filter((r) => r.id !== record.id))}
-                          className="flex h-8 w-8 items-center justify-center rounded-xl text-neutral-400 hover:bg-red-50 hover:text-red-600 transition-all"
-                        >
-                          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor">
-                            <path d="M5 7h14M10 7V5h4v2M8 7l1 12h6l1-12" strokeWidth="1.7" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>
