@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { AdminDashboard } from "@/components/AdminDashboard";
 import { AdminShell } from "@/components/AdminShell";
-import { StaffHeader } from "@/components/StaffHeader";
 import { getSession } from "@/lib/auth";
 import { getStore } from "@/lib/store";
 import { publicUser } from "@/lib/users";
@@ -16,14 +15,7 @@ export default async function AdminPage() {
 
   return (
     <main className="min-h-svh bg-neutral-100 text-black">
-      <StaffHeader
-        session={session}
-        title="Admin"
-        subtitle="Sales and staff"
-      />
-
       <AdminShell session={session} users={store.users.map(publicUser)} store={store}>
-        {/* I-pass ang store prop dito */}
         <AdminDashboard store={store} />
       </AdminShell>
     </main>
