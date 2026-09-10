@@ -14,7 +14,7 @@ import type {
 import { DEFAULT_MENU, MENU_CATEGORIES } from "@/lib/menu";
 import { parsePayment } from "@/lib/payments";
 import { DEFAULT_PROMOS } from "@/lib/promos";
-import { DEFAULT_USERS } from "@/lib/users";
+import { DEFAULT_USERS, normalizeStaffRole } from "@/lib/users";
 
 const STORE_STATE_ID = "commune-coffee";
 
@@ -269,10 +269,24 @@ function normalizeStore(store: StoreData): StoreData {
       ...item,
       username: String(item.username ?? "").toLowerCase(),
       name: item.name || item.username,
-      title: item.title || (item.role === "admin" ? "Owner" : "Barista"),
-      role: item.role === "admin" ? "admin" : "barista",
+      title: item.title || (item.role === "admin" ? "Owner" : item.role === "manager" ? "Manager" : item.role === "cashier" ? "Cashier" : "Barista"),
+      role: normalizeStaffRole({
+        role: item.role,
+        password: String(item.password ?? ""),
+      }),
       password: String(item.password ?? ""),
     }));
+    if (!store.users.some((user) => user.role === "manager" && user.password)) {
+      const managerUsernameTaken = store.users.some((user) => user.username === "manager");
+      store.users.push({
+        id: "manager-1",
+        username: managerUsernameTaken ? `manager-${Date.now().toString(36)}` : "manager",
+        password: "commune",
+        name: "Manager",
+        role: "manager",
+        title: "Manager",
+      });
+    }
   }
   return store;
 }
@@ -327,9 +341,12 @@ async function readStore(): Promise<StoreData> {
   const store = normalizeStore(original);
   const originalCostings = Array.isArray(original.costings) ? original.costings : [];
   const originalInventory = Array.isArray(original.inventory) ? original.inventory : [];
+  const originalUsers = Array.isArray(original.users) ? original.users : [];
   if (
     store.costings.length !== originalCostings.length ||
-    store.inventory.length !== originalInventory.length
+    store.inventory.length !== originalInventory.length ||
+    store.users.length !== originalUsers.length ||
+    store.users.some((user) => originalUsers.find((item) => item.id === user.id)?.role !== user.role)
   ) {
     await writeStore(store);
   }

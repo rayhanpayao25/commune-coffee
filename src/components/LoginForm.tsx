@@ -7,12 +7,17 @@ const ROLES = [
   {
     id: "admin",
     label: "Admin",
-    note: "Sales and staff",
+    note: "Sales, staff, and inventory",
   },
   {
-    id: "barista",
-    label: "Barista",
+    id: "cashier",
+    label: "Cashier",
     note: "POS only",
+  },
+  {
+    id: "manager",
+    label: "Manager",
+    note: "Void transactions only",
   },
 ] as const;
 
@@ -23,18 +28,19 @@ const field =
 
 export function LoginForm() {
   const [state, action, pending] = useActionState(login, initial);
-  const [role, setRole] = useState<(typeof ROLES)[number]["id"]>("barista");
+  const [role, setRole] = useState<(typeof ROLES)[number]["id"]>("cashier");
   const selected = ROLES.find((item) => item.id === role) ?? ROLES[1];
 
   return (
     <form action={action} className="w-full max-w-md space-y-6">
-      <div className="grid grid-cols-2 gap-2">
+      <input type="hidden" name="role" value={role} />
+      <div className="grid grid-cols-3 gap-2">
         {ROLES.map((item) => (
           <button
             key={item.id}
             type="button"
             onClick={() => setRole(item.id)}
-            className={`rounded-full border px-4 py-3 text-sm transition ${
+            className={`rounded-full border px-2 py-3 text-sm transition sm:px-4 ${
               role === item.id
                 ? "border-white bg-white text-black"
                 : "border-white/40 text-white hover:border-white"

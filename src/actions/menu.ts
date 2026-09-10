@@ -15,8 +15,8 @@ const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 
 async function requireBarista() {
   const session = await getSession();
-  if (!session || session.role !== "barista") {
-    throw new Error("Only the barista can edit the menu.");
+  if (!session || session.role !== "cashier") {
+    throw new Error("Only a cashier can edit the menu.");
   }
   return session;
 }

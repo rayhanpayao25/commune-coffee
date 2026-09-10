@@ -81,7 +81,7 @@ function CustomerSlip({ ticket }: { ticket: ReceiptTicket }) {
         Order No. {ticket.ticketNo}
       </p>
       <p className="text-center">{receiptWhen(ticket.at)}</p>
-      <p className="text-center">Barista: {ticket.barista}</p>
+      <p className="text-center">Cashier: {ticket.barista}</p>
       <Rule />
       <Row left="Item" right="Amount" strong />
       {ticket.items.map((item) => (
@@ -195,7 +195,7 @@ export function ReceiptPreview({
             <Slip title="For the customer" paperWidth={paperWidth}>
               <CustomerSlip ticket={ticket} />
             </Slip>
-            <Slip title="For the barista" paperWidth={paperWidth}>
+            <Slip title="For the cashier" paperWidth={paperWidth}>
               <BaristaSlip ticket={ticket} />
             </Slip>
           </div>

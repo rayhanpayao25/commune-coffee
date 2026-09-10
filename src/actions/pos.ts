@@ -5,13 +5,22 @@ import { getSession } from "@/lib/auth";
 import { nextTicketNo } from "@/lib/escpos";
 import { parsePayment } from "@/lib/payments";
 import { ingredientsForOrderLine, roundQty } from "@/lib/inventory";
-import { updateStore } from "@/lib/store";
+import { canUsePos } from "@/lib/users";
+import { getStore, updateStore } from "@/lib/store";
 import type { OrderItem, StoreData } from "@/lib/types";
 
-async function requireBarista() {
+async function requirePos() {
   const session = await getSession();
-  if (!session || session.role !== "barista") {
-    throw new Error("Only the barista can use the POS.");
+  if (!session || !canUsePos(session.role)) {
+    throw new Error("Only POS staff can use the POS.");
+  }
+  return session;
+}
+
+async function requireCashier() {
+  const session = await getSession();
+  if (!session || session.role !== "cashier") {
+    throw new Error("Only a cashier can take orders.");
   }
   return session;
 }
@@ -61,7 +70,7 @@ export async function deleteAdminRecord(kind: "order" | "inventory" | "restock" 
 }
 
 export async function openPos() {
-  const session = await requireBarista();
+  const session = await requirePos();
   await updateStore((store) => {
     store.pos = {
       isOpen: true,
@@ -74,7 +83,7 @@ export async function openPos() {
 }
 
 export async function closePos() {
-  await requireBarista();
+  await requirePos();
   await updateStore((store) => {
     store.pos = {
       isOpen: false,
@@ -92,7 +101,7 @@ export async function createOrder(
   paymentMethod?: string | null,
   tendered?: number | null,
 ) {
-  const session = await requireBarista();
+  const session = await requireCashier();
 
   if (cart.length === 0) {
     return { error: "Add a drink before charging." };
@@ -238,8 +247,40 @@ export async function createOrder(
   return { ok: true, total: charged, ticketNo };
 }
 
-export async function voidOrder(orderId: string) {
-  await requireBarista();
+export async function verifyManager(username: string, password: string) {
+  await requirePos();
+  const store = await getStore();
+  const user = store.users.find(
+    (entry) =>
+      entry.role === "manager" &&
+      entry.username === username.trim().toLowerCase() &&
+      Boolean(entry.password) &&
+      entry.password === password,
+  );
+  if (!user) {
+    return { error: "Manager credentials required to void." };
+  }
+  return { ok: true, name: user.name };
+}
+
+export async function voidOrder(
+  orderId: string,
+  reason: string,
+  managerUsername?: string,
+  managerPassword?: string,
+) {
+  const session = await requirePos();
+  if (!reason.trim()) {
+    return { error: "Enter a reason for voiding." };
+  }
+
+  if (session.role === "cashier") {
+    const auth = await verifyManager(managerUsername ?? "", managerPassword ?? "");
+    if ("error" in auth) return auth;
+  } else if (session.role !== "manager") {
+    return { error: "Only a manager can void a transaction." };
+  }
+
   let error: string | undefined;
 
   await updateStore((store) => {

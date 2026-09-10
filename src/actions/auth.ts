@@ -10,7 +10,7 @@ import {
   sessionCookieOptions,
 } from "@/lib/auth";
 import { getStore, recordAuthActivity } from "@/lib/store";
-import { toSession } from "@/lib/users";
+import { parseLoginRole, toSession } from "@/lib/users";
 
 export type LoginState = {
   error?: string;
@@ -22,7 +22,11 @@ export async function login(
 ): Promise<LoginState> {
   const username = String(formData.get("username") ?? "").trim();
   const password = String(formData.get("password") ?? "");
+  const selectedRole = parseLoginRole(String(formData.get("role") ?? ""));
 
+  if (!selectedRole) {
+    return { error: "Select Admin, Cashier, or Manager." };
+  }
   if (!username || !password) {
     return { error: "Enter a username and password." };
   }
@@ -36,6 +40,9 @@ export async function login(
   );
   if (!user) {
     return { error: "Those credentials do not match a commune staff account." };
+  }
+  if (user.role !== selectedRole) {
+    return { error: `Those credentials are not for the ${selectedRole} role.` };
   }
 
   const session = toSession(user);

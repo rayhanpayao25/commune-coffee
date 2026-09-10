@@ -10,7 +10,7 @@ export function proxy(request: NextRequest) {
     if (!session) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
-    if (session.role !== "barista") {
+    if (session.role !== "cashier" && session.role !== "manager") {
       return NextResponse.redirect(new URL(homeForRole(session.role), request.url));
     }
   }

@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { logout } from "@/actions/auth";
-import { createOrder, openPos } from "@/actions/pos";
+import { createOrder, openPos, verifyManager, voidOrder } from "@/actions/pos";
 import { ReceiptPreview } from "@/components/ReceiptPreview";
 import { formatMoney } from "@/lib/menu";
+import { phDateTimeLabel } from "@/lib/datetime";
 import { PAYMENT_METHODS, parsePayment, paymentLabel } from "@/lib/payments";
 import { nextTicketNo, type ReceiptTicket } from "@/lib/escpos";
 import { useReceiptPrinter } from "@/lib/receipt-printer";
@@ -202,6 +203,7 @@ export function PosClient({
   const [voidUsername, setVoidUsername] = useState("");
   const [voidPassword, setVoidPassword] = useState("");
   const [voidReason, setVoidReason] = useState("");
+  const [voidTargetId, setVoidTargetId] = useState<string | null>(null);
   const [promoOpen, setPromoOpen] = useState(false);
   const [promoId, setPromoId] = useState<string | null>(null);
   const [previewTicket, setPreviewTicket] = useState<ReceiptTicket | null>(null);
@@ -281,10 +283,19 @@ export function PosClient({
   const isCash = paymentMethod === "cash";
   const paid = isCash ? Number(tendered) || 0 : total;
   const change = isCash && paid >= total ? paid - total : 0;
-  const canCharge = pos.isOpen && cart.length > 0 && (!isCash || paid >= total);
+  const isManager = session.role === "manager";
+  const recentTickets = useMemo(
+    () =>
+      [...orders]
+        .filter((order) => !order.voided)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .slice(0, 20),
+    [orders],
+  );
+  const canCharge = !isManager && pos.isOpen && cart.length > 0 && (!isCash || paid >= total);
 
   function addItem(id: string, name: string, price: number) {
-    if (!pos.isOpen) {
+    if (!pos.isOpen || isManager) {
       return;
     }
     setCart((current) => {
@@ -307,23 +318,51 @@ export function PosClient({
 
   function handleConfirmVoid(e: React.FormEvent) {
     e.preventDefault();
-    if (!voidUsername || !voidPassword || !voidReason) {
-      setMessage("Please fill in all fields to void.");
+    if (!voidReason.trim()) {
+      setMessage("Enter a reason for voiding.");
       return;
     }
 
-    setCart([]);
-    setTendered("");
-    setPaymentMethod("cash");
-    setPromoId(null);
-    setPromoOpen(false);
-    setSwipeOpenId(null);
-    
-    setVoidUsername("");
-    setVoidPassword("");
-    setVoidReason("");
-    setVoidModalOpen(false);
-    setMessage("Order voided.");
+    startTransition(async () => {
+      if (isManager) {
+        if (!voidTargetId) {
+          setMessage("Select a ticket to void.");
+          return;
+        }
+        const result = await voidOrder(voidTargetId, voidReason);
+        if ("error" in result && result.error) {
+          setMessage(result.error);
+          return;
+        }
+        setVoidReason("");
+        setVoidTargetId(null);
+        setVoidModalOpen(false);
+        setMessage("Transaction voided.");
+        return;
+      }
+
+      if (!voidUsername || !voidPassword) {
+        setMessage("Manager credentials required to void.");
+        return;
+      }
+      const auth = await verifyManager(voidUsername, voidPassword);
+      if ("error" in auth && auth.error) {
+        setMessage(auth.error);
+        return;
+      }
+
+      setCart([]);
+      setTendered("");
+      setPaymentMethod("cash");
+      setPromoId(null);
+      setPromoOpen(false);
+      setSwipeOpenId(null);
+      setVoidUsername("");
+      setVoidPassword("");
+      setVoidReason("");
+      setVoidModalOpen(false);
+      setMessage("Checkout voided.");
+    });
   }
 
   function currentTicket(): ReceiptTicket {
@@ -372,6 +411,9 @@ export function PosClient({
             <p className="text-base font-bold tracking-tight lowercase">commune.</p>
             <p className="truncate text-sm font-medium text-white/80">
               {session.name}
+              <span className="ml-2 text-xs font-normal text-white/50">
+                {isManager ? "manager" : "cashier"}
+              </span>
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -449,15 +491,18 @@ export function PosClient({
                   Void Order Authorization
                 </h2>
                 <p className="mt-1 text-xs text-neutral-500">
-                  Manager or Admin approval required to proceed.
+                  {isManager
+                    ? "Enter a reason to void this ticket."
+                    : "Manager approval required to void."}
                 </p>
               </div>
 
               <div className="space-y-4">
+                {!isManager ? (
                 <div className="space-y-3">
                   <div>
                     <label className="mb-1 block text-xs font-semibold text-neutral-700">
-                      Username
+                      Manager username
                     </label>
                     <input
                       type="text"
@@ -470,7 +515,7 @@ export function PosClient({
 
                   <div>
                     <label className="mb-1 block text-xs font-semibold text-neutral-700">
-                      Password
+                      Manager password
                     </label>
                     <input
                       type="password"
@@ -481,6 +526,7 @@ export function PosClient({
                     />
                   </div>
                 </div>
+                ) : null}
 
                 <div className="pt-1">
                   <label className="mb-1 block text-xs font-semibold text-neutral-700">
@@ -526,7 +572,7 @@ export function PosClient({
               startTransition(async () => {
                 try {
                   await sendSlips(previewTicket);
-                  setMessage("Customer and barista copies sent.");
+                  setMessage("Customer and cashier copies sent.");
                   setPreviewTicket(null);
                 } catch (error) {
                   setMessage(
@@ -545,7 +591,7 @@ export function PosClient({
             <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-neutral-100 px-6 text-center">
               <p className="font-serif text-4xl italic sm:text-5xl">Closed</p>
               <p className="mt-3 max-w-sm text-sm text-neutral-500">
-                Open the POS to take orders.
+                Open the POS to {isManager ? "void tickets." : "take orders."}.
               </p>
               <button
                 type="button"
@@ -591,7 +637,8 @@ export function PosClient({
                       key={item.id}
                       type="button"
                       onClick={() => addItem(item.id, item.name, item.price)}
-                      className="rounded-2xl border border-neutral-300 bg-white p-3 text-center transition hover:border-black"
+                      disabled={isManager}
+                      className="rounded-2xl border border-neutral-300 bg-white p-3 text-center transition hover:border-black disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <p className="text-xs font-medium">{item.name}</p>
                       <p className="mt-0.5 text-xs text-neutral-600">
@@ -624,6 +671,51 @@ export function PosClient({
 
           {/* Checkout Panel Sidebar */}
           <aside className="flex min-h-0 w-full flex-col border-t border-neutral-200 bg-white md:w-[320px] lg:w-[350px] md:border-t-0 md:border-l">
+            {isManager ? (
+              <>
+                <h2 className="shrink-0 py-2.5 text-center text-lg font-semibold">
+                  Void tickets
+                </h2>
+                <ul className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
+                  {recentTickets.length === 0 ? (
+                    <li className="py-6 text-center text-xs text-neutral-400">
+                      No tickets to void.
+                    </li>
+                  ) : (
+                    recentTickets.map((order) => (
+                      <li
+                        key={order.id}
+                        className="mb-2 rounded-xl border border-neutral-200 p-3"
+                      >
+                        <p className="text-xs font-semibold">
+                          #{order.ticketNo ?? order.id.slice(-4)} · {formatMoney(order.total)}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-neutral-500">
+                          {phDateTimeLabel(order.createdAt)}
+                        </p>
+                        <p className="mt-1 text-[11px] text-neutral-600">
+                          {order.items.map((item) => `${item.qty}× ${item.name}`).join(", ")}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setVoidTargetId(order.id);
+                            setVoidModalOpen(true);
+                          }}
+                          className="mt-2 w-full rounded-lg border border-neutral-300 py-1.5 text-xs hover:border-black"
+                        >
+                          Void
+                        </button>
+                      </li>
+                    ))
+                  )}
+                </ul>
+                {message ? (
+                  <p className="px-3 pb-3 text-center text-xs text-neutral-500">{message}</p>
+                ) : null}
+              </>
+            ) : (
+              <>
             <h2 className="shrink-0 py-2.5 text-center text-lg font-semibold">
               Checkout
             </h2>
@@ -850,6 +942,8 @@ export function PosClient({
                 <p className="text-center text-xs text-neutral-500">{message}</p>
               ) : null}
             </div>
+              </>
+            )}
           </aside>
         </div>
       </div>

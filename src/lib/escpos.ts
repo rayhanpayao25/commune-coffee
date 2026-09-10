@@ -198,7 +198,7 @@ export function customerLines(
     ...shopHeader(logo),
     { kind: "text", text: `Order No. ${ticket.ticketNo}`, align: 1, size: "tall", bold: true },
     { kind: "text", text: receiptWhen(ticket.at), align: 1 },
-    { kind: "text", text: `Barista: ${ticket.barista}`, align: 1 },
+    { kind: "text", text: `Cashier: ${ticket.barista}`, align: 1 },
     { kind: "rule" },
     { kind: "text", text: padLine("Item", "Amount", width), bold: true },
   ];

@@ -81,7 +81,7 @@ export function UserManager({ users, session, loginActivity }: UserManagerProps)
   const [editingId, setEditingId] = useState<string | "new" | null>(null);
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
-  const [role, setRole] = useState<StaffRole>("Barista");
+  const [role, setRole] = useState<StaffRole>("Cashier");
   const [title, setTitle] = useState(""); 
   const [password, setPassword] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
@@ -93,7 +93,7 @@ export function UserManager({ users, session, loginActivity }: UserManagerProps)
     setEditingId("new");
     setName("");
     setUsername("");
-    setRole("Barista");
+    setRole("Cashier");
     setTitle("");
     setPassword("");
     setNotice(null);
