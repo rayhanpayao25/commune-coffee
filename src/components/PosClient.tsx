@@ -5,7 +5,7 @@ import { logout } from "@/actions/auth";
 import { createOrder, openPos, verifyManager, voidOrder } from "@/actions/pos";
 import { ReceiptPreview } from "@/components/ReceiptPreview";
 import { formatMoney } from "@/lib/menu";
-import { phDateTimeLabel } from "@/lib/datetime";
+import { phDateString, phDateTimeLabel } from "@/lib/datetime";
 import { PAYMENT_METHODS, parsePayment, paymentLabel } from "@/lib/payments";
 import { nextTicketNo, type ReceiptTicket } from "@/lib/escpos";
 import { useReceiptPrinter } from "@/lib/receipt-printer";
@@ -204,6 +204,8 @@ export function PosClient({
   const [voidPassword, setVoidPassword] = useState("");
   const [voidReason, setVoidReason] = useState("");
   const [voidTargetId, setVoidTargetId] = useState<string | null>(null);
+  const [voidSearch, setVoidSearch] = useState("");
+  const [voidTodayOnly, setVoidTodayOnly] = useState(true);
   const [promoOpen, setPromoOpen] = useState(false);
   const [promoId, setPromoId] = useState<string | null>(null);
   const [previewTicket, setPreviewTicket] = useState<ReceiptTicket | null>(null);
@@ -284,14 +286,27 @@ export function PosClient({
   const paid = isCash ? Number(tendered) || 0 : total;
   const change = isCash && paid >= total ? paid - total : 0;
   const isManager = session.role === "manager";
-  const recentTickets = useMemo(
-    () =>
-      [...orders]
-        .filter((order) => !order.voided)
-        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-        .slice(0, 20),
-    [orders],
-  );
+  const voidTickets = useMemo(() => {
+    const needle = voidSearch.trim().toLowerCase();
+    const today = phDateString();
+    return [...orders]
+      .filter((order) => !order.voided)
+      .filter((order) => !voidTodayOnly || phDateString(order.createdAt) === today)
+      .filter((order) => {
+        if (!needle) return true;
+        const haystack = [
+          String(order.ticketNo ?? ""),
+          order.baristaName,
+          formatMoney(order.total),
+          ...order.items.map((item) => `${item.qty} ${item.name}`),
+        ]
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(needle);
+      })
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }, [orders, voidSearch, voidTodayOnly]);
+  const selectedVoidOrder = orders.find((order) => order.id === voidTargetId);
   const canCharge = !isManager && pos.isOpen && cart.length > 0 && (!isCash || paid >= total);
 
   function addItem(id: string, name: string, price: number) {
@@ -488,14 +503,31 @@ export function PosClient({
                   </svg>
                 </div>
                 <h2 className="text-xl font-bold tracking-tight text-neutral-900">
-                  Void Order Authorization
+                  {isManager ? "Void this ticket?" : "Void checkout"}
                 </h2>
                 <p className="mt-1 text-xs text-neutral-500">
                   {isManager
-                    ? "Enter a reason to void this ticket."
+                    ? "This cannot be undone."
                     : "Manager approval required to void."}
                 </p>
               </div>
+
+              {isManager && selectedVoidOrder ? (
+                <div className="mb-4 rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-left">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <p className="text-sm font-semibold">
+                      Ticket #{selectedVoidOrder.ticketNo ?? selectedVoidOrder.id.slice(-4)}
+                    </p>
+                    <p className="text-sm font-semibold">{formatMoney(selectedVoidOrder.total)}</p>
+                  </div>
+                  <p className="mt-1 text-xs text-neutral-500">
+                    {phDateTimeLabel(selectedVoidOrder.createdAt)} · {selectedVoidOrder.baristaName}
+                  </p>
+                  <p className="mt-2 text-xs text-neutral-700">
+                    {selectedVoidOrder.items.map((item) => `${item.qty}× ${item.name}`).join(", ")}
+                  </p>
+                </div>
+              ) : null}
 
               <div className="space-y-4">
                 {!isManager ? (
@@ -554,7 +586,7 @@ export function PosClient({
                   type="submit"
                   className="w-2/3 rounded-xl bg-black py-2.5 text-xs font-medium text-white transition hover:bg-neutral-800 active:scale-[0.99]"
                 >
-                  Confirm Void
+                  {isManager ? "Void ticket" : "Confirm Void"}
                 </button>
               </div>
             </form>
@@ -604,6 +636,155 @@ export function PosClient({
             </div>
           ) : null}
 
+          {isManager ? (
+            <section className="flex min-h-0 min-w-0 flex-1 flex-col bg-neutral-100">
+              <div className="shrink-0 border-b border-neutral-200 bg-white px-4 py-4 sm:px-6">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold tracking-tight">Void tickets</h2>
+                    <p className="mt-0.5 text-sm text-neutral-500">
+                      {voidTickets.length} open {voidTickets.length === 1 ? "ticket" : "tickets"}
+                      {voidTodayOnly ? " today" : ""}
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <div className="flex rounded-full border border-neutral-200 bg-neutral-50 p-1">
+                      <button
+                        type="button"
+                        onClick={() => setVoidTodayOnly(true)}
+                        className={`rounded-full px-3 py-1.5 text-xs font-medium ${
+                          voidTodayOnly ? "bg-black text-white" : "text-neutral-600 hover:text-black"
+                        }`}
+                      >
+                        Today
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setVoidTodayOnly(false)}
+                        className={`rounded-full px-3 py-1.5 text-xs font-medium ${
+                          !voidTodayOnly ? "bg-black text-white" : "text-neutral-600 hover:text-black"
+                        }`}
+                      >
+                        All
+                      </button>
+                    </div>
+                    <div className="relative sm:w-72">
+                      <svg
+                        viewBox="0 0 24 24"
+                        className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 stroke-neutral-400"
+                        fill="none"
+                      >
+                        <circle cx="11" cy="11" r="6" strokeWidth="1.6" />
+                        <path d="M16 16l4 4" strokeWidth="1.6" />
+                      </svg>
+                      <input
+                        value={voidSearch}
+                        onChange={(event) => setVoidSearch(event.target.value)}
+                        placeholder="Search ticket, item, or cashier"
+                        className="w-full rounded-full border border-neutral-300 bg-white py-2 pr-4 pl-10 text-sm outline-none placeholder:text-neutral-400 focus:border-black"
+                      />
+                    </div>
+                  </div>
+                </div>
+                {message ? <p className="mt-3 text-sm text-neutral-600">{message}</p> : null}
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+                {voidTickets.length === 0 ? (
+                  <div className="flex h-full min-h-[240px] items-center justify-center rounded-2xl border border-dashed border-neutral-300 bg-white text-sm text-neutral-400">
+                    No tickets to void.
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-3 md:hidden">
+                      {voidTickets.map((order) => (
+                        <article key={order.id} className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-base font-semibold">
+                                #{order.ticketNo ?? order.id.slice(-4)}
+                              </p>
+                              <p className="mt-0.5 text-xs text-neutral-500">
+                                {phDateTimeLabel(order.createdAt)} · {order.baristaName}
+                              </p>
+                            </div>
+                            <p className="text-base font-semibold">{formatMoney(order.total)}</p>
+                          </div>
+                          <p className="mt-2 text-sm text-neutral-700">
+                            {order.items.map((item) => `${item.qty}× ${item.name}`).join(", ")}
+                          </p>
+                          <p className="mt-1 text-xs text-neutral-400">{paymentLabel(order.paymentMethod)}</p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setVoidTargetId(order.id);
+                              setVoidReason("");
+                              setVoidModalOpen(true);
+                            }}
+                            className="mt-3 w-full rounded-xl bg-black py-3 text-sm font-medium text-white hover:bg-neutral-800"
+                          >
+                            Void ticket
+                          </button>
+                        </article>
+                      ))}
+                    </div>
+
+                    <div className="hidden overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm md:block">
+                      <table className="w-full text-left text-sm">
+                        <thead className="bg-black text-xs font-semibold tracking-wide text-white uppercase">
+                          <tr>
+                            <th className="px-4 py-3">Ticket</th>
+                            <th className="px-4 py-3">Time</th>
+                            <th className="px-4 py-3">Cashier</th>
+                            <th className="px-4 py-3">Items</th>
+                            <th className="px-4 py-3">Pay</th>
+                            <th className="px-4 py-3 text-right">Total</th>
+                            <th className="px-4 py-3 text-right"> </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {voidTickets.map((order) => (
+                            <tr key={order.id} className="border-t border-neutral-100 hover:bg-neutral-50">
+                              <td className="px-4 py-4 font-semibold whitespace-nowrap">
+                                #{order.ticketNo ?? order.id.slice(-4)}
+                              </td>
+                              <td className="px-4 py-4 whitespace-nowrap text-neutral-600">
+                                {phDateTimeLabel(order.createdAt)}
+                              </td>
+                              <td className="px-4 py-4 whitespace-nowrap">{order.baristaName}</td>
+                              <td className="max-w-[320px] px-4 py-4 text-neutral-700">
+                                {order.items.map((item) => `${item.qty}× ${item.name}`).join(", ")}
+                              </td>
+                              <td className="px-4 py-4 whitespace-nowrap text-neutral-500">
+                                {paymentLabel(order.paymentMethod)}
+                              </td>
+                              <td className="px-4 py-4 text-right font-semibold whitespace-nowrap">
+                                {formatMoney(order.total)}
+                              </td>
+                              <td className="px-4 py-4 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setVoidTargetId(order.id);
+                                    setVoidReason("");
+                                    setVoidModalOpen(true);
+                                  }}
+                                  className="rounded-full bg-black px-4 py-2 text-xs font-medium text-white hover:bg-neutral-800"
+                                >
+                                  Void
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
+              </div>
+            </section>
+          ) : (
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col md:flex-row">
           {/* Menu Catalog Section */}
           <section className="relative flex min-h-0 min-w-0 flex-1 flex-col">
             <div className="flex items-center gap-3 px-4 py-2">
@@ -671,51 +852,6 @@ export function PosClient({
 
           {/* Checkout Panel Sidebar */}
           <aside className="flex min-h-0 w-full flex-col border-t border-neutral-200 bg-white md:w-[320px] lg:w-[350px] md:border-t-0 md:border-l">
-            {isManager ? (
-              <>
-                <h2 className="shrink-0 py-2.5 text-center text-lg font-semibold">
-                  Void tickets
-                </h2>
-                <ul className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
-                  {recentTickets.length === 0 ? (
-                    <li className="py-6 text-center text-xs text-neutral-400">
-                      No tickets to void.
-                    </li>
-                  ) : (
-                    recentTickets.map((order) => (
-                      <li
-                        key={order.id}
-                        className="mb-2 rounded-xl border border-neutral-200 p-3"
-                      >
-                        <p className="text-xs font-semibold">
-                          #{order.ticketNo ?? order.id.slice(-4)} · {formatMoney(order.total)}
-                        </p>
-                        <p className="mt-0.5 text-[11px] text-neutral-500">
-                          {phDateTimeLabel(order.createdAt)}
-                        </p>
-                        <p className="mt-1 text-[11px] text-neutral-600">
-                          {order.items.map((item) => `${item.qty}× ${item.name}`).join(", ")}
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setVoidTargetId(order.id);
-                            setVoidModalOpen(true);
-                          }}
-                          className="mt-2 w-full rounded-lg border border-neutral-300 py-1.5 text-xs hover:border-black"
-                        >
-                          Void
-                        </button>
-                      </li>
-                    ))
-                  )}
-                </ul>
-                {message ? (
-                  <p className="px-3 pb-3 text-center text-xs text-neutral-500">{message}</p>
-                ) : null}
-              </>
-            ) : (
-              <>
             <h2 className="shrink-0 py-2.5 text-center text-lg font-semibold">
               Checkout
             </h2>
@@ -942,9 +1078,9 @@ export function PosClient({
                 <p className="text-center text-xs text-neutral-500">{message}</p>
               ) : null}
             </div>
-              </>
-            )}
           </aside>
+            </div>
+          )}
         </div>
       </div>
     </div>
