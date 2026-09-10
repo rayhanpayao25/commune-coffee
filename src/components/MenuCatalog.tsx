@@ -538,7 +538,6 @@ export function MenuCatalog({ menu, categories }: MenuCatalogProps) {
                               aria-label={`Delete ${item.name}`}
                               disabled={pending}
                               onClick={() => {
-                                if (!window.confirm(`Delete “${item.name}”?`)) return;
                                 startTransition(async () => {
                                   const result = await deleteMenuItem(item.id);
                                   const error = actionError(result);
