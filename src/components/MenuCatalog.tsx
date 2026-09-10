@@ -76,6 +76,19 @@ function EyeOffIcon() {
   );
 }
 
+function actionError(result: unknown) {
+  if (
+    result &&
+    typeof result === "object" &&
+    "error" in result &&
+    typeof result.error === "string" &&
+    result.error
+  ) {
+    return result.error;
+  }
+  return null;
+}
+
 export function MenuCatalog({ menu, categories }: MenuCatalogProps) {
   const [tab, setTab] = useState<SubTab>("items");
   const [notice, setNotice] = useState<string | null>(null);
@@ -203,8 +216,9 @@ export function MenuCatalog({ menu, categories }: MenuCatalogProps) {
                 event.preventDefault();
                 startTransition(async () => {
                   const result = await addMenuCategory(newCategory);
-                  if (result && "error" in result && result.error) {
-                    flash(result.error);
+                  const error = actionError(result);
+                  if (error) {
+                    flash(error);
                     return;
                   }
                   setNewCategory("");
@@ -275,8 +289,9 @@ export function MenuCatalog({ menu, categories }: MenuCatalogProps) {
                                     onClick={() =>
                                       startTransition(async () => {
                                         const result = await renameMenuCategory(category, categoryName);
-                                        if (result && "error" in result && result.error) {
-                                          flash(result.error);
+                                        const error = actionError(result);
+                                        if (error) {
+                                          flash(error);
                                           return;
                                         }
                                         setEditingCategory(null);
@@ -322,8 +337,9 @@ export function MenuCatalog({ menu, categories }: MenuCatalogProps) {
                                       if (!window.confirm(`Delete category “${category}”?`)) return;
                                       startTransition(async () => {
                                         const result = await deleteMenuCategory(category);
-                                        if (result && "error" in result && result.error) {
-                                          flash(result.error);
+                                        const error = actionError(result);
+                                        if (error) {
+                                          flash(error);
                                           return;
                                         }
                                         flash("Category deleted.");
@@ -357,8 +373,9 @@ export function MenuCatalog({ menu, categories }: MenuCatalogProps) {
                       editingId === "new"
                         ? await createMenuItem(itemFormData())
                         : await updateMenuItem(itemFormData());
-                    if (result && "error" in result && result.error) {
-                      flash(result.error);
+                    const error = actionError(result);
+                    if (error) {
+                      flash(error);
                       return;
                     }
                     resetItemForm();
@@ -524,8 +541,9 @@ export function MenuCatalog({ menu, categories }: MenuCatalogProps) {
                                 if (!window.confirm(`Delete “${item.name}”?`)) return;
                                 startTransition(async () => {
                                   const result = await deleteMenuItem(item.id);
-                                  if (result && "error" in result && result.error) {
-                                    flash(result.error);
+                                  const error = actionError(result);
+                                  if (error) {
+                                    flash(error);
                                     return;
                                   }
                                   if (editingId === item.id) resetItemForm();
