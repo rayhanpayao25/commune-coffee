@@ -286,7 +286,13 @@ export function PosClient({
             <button
               type="button"
               disabled={pending}
-              onClick={() => startTransition(async () => await logout())}
+              onClick={() => {
+                if (cart.length > 0) {
+                  setMessage("Finish or void the checkout before logging out.");
+                  return;
+                }
+                startTransition(async () => await logout());
+              }}
               className="rounded-lg bg-neutral-900 px-3 py-1.5 text-xs font-medium text-neutral-300 transition hover:bg-neutral-800 hover:text-white active:scale-95 disabled:opacity-50"
             >
               {pending ? "Logging out..." : "Log out"}
