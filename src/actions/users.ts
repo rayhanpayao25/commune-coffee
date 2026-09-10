@@ -39,7 +39,29 @@ function parseStaff(input: {
 }): { error: string } | { name: string; username: string; title: string; role: Role; password?: string } {
   const name = input.name.trim();
   const role = parseRole(input.role);
-  const title = input.title.trim() || (role === "admin" ? "Owner" : "Barista");
+  if (!name) return { error: "Enter a display name." };
+
+  if (role === "barista") {
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 20) || "barista";
+    const username = (
+      input.username.trim() || `${slug}-${Date.now().toString(36)}`
+    )
+      .toLowerCase()
+      .replace(/[^a-z0-9._-]+/g, "")
+      .slice(0, 32);
+    if (!username || username.length < 2) {
+      return { error: "Enter a display name." };
+    }
+    return {
+      name,
+      username,
+      title: "Barista",
+      role,
+      password: input.requirePassword ? "" : undefined,
+    };
+  }
+
+  const title = input.title.trim() || (role === "admin" ? "Owner" : "Staff");
   const password = input.password;
   const username = (
     input.username.trim() ||
@@ -49,7 +71,6 @@ function parseStaff(input: {
     .replace(/[^a-z0-9._-]+/g, "")
     .slice(0, 32);
 
-  if (!name) return { error: "Enter a display name." };
   if (!username || username.length < 2) {
     return { error: "Enter a username (letters and numbers)." };
   }
@@ -77,7 +98,7 @@ export async function createStaffUser(input: {
   password: string;
 }) {
   await requireAdmin();
-  const parsed = parseStaff({ ...input, requirePassword: true });
+  const parsed = parseStaff({ ...input, requirePassword: parseRole(input.role) !== "barista" });
   if ("error" in parsed) return parsed;
 
   let error: string | undefined;
@@ -145,7 +166,11 @@ export async function updateStaffUser(input: {
     user.username = parsed.username;
     user.title = parsed.title;
     user.role = parsed.role;
-    if (parsed.password) user.password = parsed.password;
+    if (parsed.role === "barista") {
+      user.password = "";
+    } else if (parsed.password) {
+      user.password = parsed.password;
+    }
     nextUser = { ...user };
   });
 

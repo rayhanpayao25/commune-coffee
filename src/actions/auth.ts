@@ -29,7 +29,10 @@ export async function login(
 
   const store = await getStore();
   const user = store.users.find(
-    (entry) => entry.username === username.toLowerCase() && entry.password === password,
+    (entry) =>
+      entry.username === username.toLowerCase() &&
+      Boolean(entry.password) &&
+      entry.password === password,
   );
   if (!user) {
     return { error: "Those credentials do not match a commune staff account." };

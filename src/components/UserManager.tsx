@@ -174,25 +174,22 @@ export function UserManager({ users, session, loginActivity }: UserManagerProps)
                 onSubmit={(event) => {
                   event.preventDefault();
                   startTransition(async () => {
-                    const dbRole = role.toLowerCase();
-                    
-                    const finalUsername = 
-                      !username.trim() && role === "Barista"
-                        ? name.toLowerCase().replace(/\s+/g, "") + "_barista"
-                        : username;
-
-                    const finalPassword = 
-                      !password.trim() && editingId === "new" && role === "Barista"
-                        ? "barista123" 
-                        : password;
-
-                    const payload = { 
-                      name, 
-                      username: finalUsername, 
-                      title: title || (role === "Barista" ? "Barista" : role), 
-                      role: dbRole, 
-                      password: finalPassword 
-                    };
+                    const isBarista = role === "Barista";
+                    const payload = isBarista
+                      ? {
+                          name,
+                          username: editingId === "new" ? "" : username,
+                          title: "Barista",
+                          role: "barista",
+                          password: "",
+                        }
+                      : {
+                          name,
+                          username,
+                          title: title || role,
+                          role: role.toLowerCase(),
+                          password,
+                        };
 
                     const result =
                       editingId === "new"
@@ -207,7 +204,6 @@ export function UserManager({ users, session, loginActivity }: UserManagerProps)
                     }
                     if (editingId === "new") {
                       startCreate();
-                      setNotice("Staff added successfully.");
                     } else {
                       resetForm();
                       setNotice("Account updated successfully.");
@@ -217,12 +213,16 @@ export function UserManager({ users, session, loginActivity }: UserManagerProps)
               >
                 <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
                   <p className="text-xs font-semibold tracking-wider text-neutral-400 uppercase">
-                    {editingId === "new" ? "New Account" : `Edit account: ${editing?.name ?? ""}`}
+                    {editingId === "new"
+                      ? role === "Barista"
+                        ? "New barista"
+                        : "New Account"
+                      : `Edit ${role === "Barista" ? "barista" : "account"}: ${editing?.name ?? ""}`}
                   </p>
                 </div>
                 
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <label className="text-xs font-medium text-neutral-600">
+                  <label className={`text-xs font-medium text-neutral-600 ${role === "Barista" ? "sm:col-span-2" : ""}`}>
                     <span className="mb-1.5 block">Name</span>
                     <input
                       value={name}
@@ -232,46 +232,48 @@ export function UserManager({ users, session, loginActivity }: UserManagerProps)
                       required
                     />
                   </label>
+                  {role === "Barista" ? (
+                    <p className="sm:col-span-2 text-xs text-neutral-500">
+                      Baristas are added by name only. No username or password — they cannot log in.
+                    </p>
+                  ) : (
+                    <>
                   <label className="text-xs font-medium text-neutral-600">
-                    <span className="mb-1.5 block">
-                      Username {role === "Barista" && <span className="text-neutral-400 font-normal">(Optional for Barista)</span>}
-                    </span>
+                    <span className="mb-1.5 block">Username</span>
                     <input
                       value={username}
                       onChange={(event) => setUsername(event.target.value)}
                       className={field}
-                      placeholder={role === "Barista" ? "Auto-generated if left blank" : "login name"}
+                      placeholder="login name"
                       autoComplete="off"
-                      required={role !== "Barista"}
+                      required
                     />
                   </label>
 
                   <label className="text-xs font-medium text-neutral-600 sm:col-span-2">
-                    <span className="mb-1.5 block">
-                      Title {role === "Barista" && <span className="text-neutral-400 font-normal">(Optional, defaults to Barista)</span>}
-                    </span>
+                    <span className="mb-1.5 block">Title</span>
                     <input
                       value={title}
                       onChange={(event) => setTitle(event.target.value)}
                       className={field}
-                      placeholder={role === "Barista" ? "Head Barista, Senior Barista, etc." : "Barista, Manager, Cashier"}
+                      placeholder="Manager, Cashier"
                     />
                   </label>
 
                   <label className="text-xs font-medium text-neutral-600 sm:col-span-2">
-                    <span className="mb-1.5 block">
-                      Password {role === "Barista" && <span className="text-neutral-400 font-normal">(Defaults if left blank)</span>}
-                    </span>
+                    <span className="mb-1.5 block">Password</span>
                     <input
                       type="password"
                       value={password}
                       onChange={(event) => setPassword(event.target.value)}
                       className={field}
-                      placeholder={role === "Barista" ? "Default: barista123 if left blank" : "at least 4 characters"}
+                      placeholder="at least 4 characters"
                       autoComplete="new-password"
-                      required={editingId === "new" && role !== "Barista"}
+                      required={editingId === "new"}
                     />
                   </label>
+                    </>
+                  )}
                 </div>
 
                 <div>
@@ -343,7 +345,9 @@ export function UserManager({ users, session, loginActivity }: UserManagerProps)
                       ) : null}
                     </div>
                     <p className="text-xs text-neutral-400 mt-0.5">
-                      {user.username} <span className="text-neutral-300">·</span> {user.title || user.role}
+                      {user.role === "barista"
+                        ? "Barista"
+                        : `${user.username} · ${user.title || user.role}`}
                     </p>
                   </div>
                   <div className="flex items-center gap-1">
