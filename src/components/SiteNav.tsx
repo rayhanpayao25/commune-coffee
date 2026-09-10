@@ -78,12 +78,14 @@ export function SiteNav({ session }: SiteNavProps) {
               {link.label}
             </Link>
           ))}
-          <Link
-            href={staffHref}
-            className="shrink-0 rounded-full bg-white px-5 py-2 text-[11px] font-semibold tracking-[0.2em] text-black uppercase transition hover:bg-neutral-200"
-          >
-            {staffLabel}
-          </Link>
+          {session ? (
+            <Link
+              href={staffHref}
+              className="shrink-0 rounded-full bg-white px-5 py-2 text-[11px] font-semibold tracking-[0.2em] text-black uppercase transition hover:bg-neutral-200"
+            >
+              {staffLabel}
+            </Link>
+          ) : null}
         </div>
       </nav>
 
@@ -144,13 +146,15 @@ export function SiteNav({ session }: SiteNavProps) {
                     {link.label}
                   </Link>
                 ))}
-                <Link
-                  href={staffHref}
-                  onClick={() => setOpen(false)}
-                  className="mt-1 mb-1 block rounded-full bg-white px-4 py-2.5 text-center text-[11px] font-semibold tracking-[0.2em] text-black uppercase"
-                >
-                  {staffLabel}
-                </Link>
+                {session ? (
+                  <Link
+                    href={staffHref}
+                    onClick={() => setOpen(false)}
+                    className="mt-1 mb-1 block rounded-full bg-white px-4 py-2.5 text-center text-[11px] font-semibold tracking-[0.2em] text-black uppercase"
+                  >
+                    {staffLabel}
+                  </Link>
+                ) : null}
               </nav>
               <div className="flex items-center justify-between gap-3 border-t border-white/10 px-4 py-3">
                 <p className="text-[10px] tracking-[0.28em] text-neutral-500 uppercase">
