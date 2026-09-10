@@ -2,13 +2,11 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { logout } from "@/actions/auth";
-import { createMenuItem } from "@/actions/menu";
 import { createOrder, openPos } from "@/actions/pos";
-import { ItemForm, PosDrawer } from "@/components/PosDrawer";
 import { ReceiptPreview } from "@/components/ReceiptPreview";
 import { formatMoney } from "@/lib/menu";
 import { PAYMENT_METHODS, paymentLabel } from "@/lib/payments";
-import { nextTicketNo, receiptFromOrder, type ReceiptTicket } from "@/lib/escpos";
+import { nextTicketNo, type ReceiptTicket } from "@/lib/escpos";
 import { useReceiptPrinter } from "@/lib/receipt-printer";
 import type {
   MenuItem,
@@ -44,8 +42,6 @@ export function PosClient({
   const [category, setCategory] = useState("All");
   const [tendered, setTendered] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [addingProduct, setAddingProduct] = useState(false);
   const [voidModalOpen, setVoidModalOpen] = useState(false);
   const [voidUsername, setVoidUsername] = useState("");
   const [voidPassword, setVoidPassword] = useState("");
@@ -171,17 +167,12 @@ export function PosClient({
     setMessage("Add items before printing.");
   }
 
-  function reprintOrder(order: Order) {
-    setMenuOpen(false);
-    setPreviewTicket(receiptFromOrder(order, orders));
-  }
-
   async function sendSlips(ticket: ReceiptTicket) {
     if (!printer.supported) {
       throw new Error("Open the POS in Chrome or Edge to use the receipt printer.");
     }
     if (!printer.connected) {
-      throw new Error("Connect the receipt printer from the menu first.");
+      throw new Error("Connect the receipt printer first.");
     }
     await printer.print(ticket);
   }
@@ -190,74 +181,42 @@ export function PosClient({
     <div className="relative flex h-svh flex-col overflow-hidden bg-neutral-100 text-black">
       <div className="pos-screen flex min-h-0 flex-1 flex-col overflow-hidden">
         <header className="flex h-12 shrink-0 items-center justify-between bg-black px-4 text-white">
-          <div className="flex items-center gap-3">
+          <p className="text-base font-bold tracking-tight lowercase">commune.</p>
+          <div className="flex items-center gap-2">
             <button
               type="button"
-              aria-label={menuOpen ? "Close menu" : "Open menu"}
-              aria-expanded={menuOpen}
-              onClick={() => setMenuOpen((value) => !value)}
-              className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-neutral-800 transition"
-            >
-              <svg viewBox="0 0 24 24" className="h-5 w-5 stroke-white" fill="none">
-                {menuOpen ? (
-                  <path d="M6 6l12 12M18 6L6 18" strokeWidth="1.8" />
-                ) : (
-                  <path d="M5 7h14M5 12h14M5 17h14" strokeWidth="1.8" />
-                )}
-              </svg>
-            </button>
-            <p className="text-base font-bold tracking-tight lowercase">commune.</p>
-          </div>
-
-          {/* Text Button for Logout */}
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => startTransition(async () => await logout())}
-            className="rounded-lg bg-neutral-900 px-3 py-1.5 text-xs font-medium text-neutral-300 transition hover:bg-neutral-800 hover:text-white active:scale-95 disabled:opacity-50"
-          >
-            {pending ? "Logging out..." : "Log out"}
-          </button>
-        </header>
-
-        {/* Add Product Modal */}
-        {addingProduct ? (
-          <div className="absolute inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-xs p-4 sm:items-center">
-            <div className="w-full max-w-md rounded-3xl bg-white p-5 text-black shadow-2xl">
-              <div className="mb-4 flex items-center justify-between">
-                <h3 className="text-lg font-semibold">Add product</h3>
-                <button
-                  type="button"
-                  aria-label="Close"
-                  onClick={() => setAddingProduct(false)}
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-400 hover:bg-neutral-100 hover:text-black transition"
-                >
-                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor">
-                    <path d="M6 6l12 12M18 6L6 18" strokeWidth="1.8" />
-                  </svg>
-                </button>
-              </div>
-              <ItemForm
-                item={null}
-                categories={categories}
-                defaultCategory={category === "All" ? categories[0] : category}
-                pending={pending}
-                onCancel={() => setAddingProduct(false)}
-                onSave={(formData) =>
-                  startTransition(async () => {
-                    const result = await createMenuItem(formData);
-                    if (result.error) {
-                      setMessage(result.error);
+              disabled={pending || !printer.supported}
+              onClick={() =>
+                startTransition(async () => {
+                  try {
+                    if (printer.connected) {
+                      await printer.disconnect();
+                      setMessage("Printer disconnected.");
                       return;
                     }
-                    setAddingProduct(false);
-                    setMessage("Product added.");
-                  })
-                }
-              />
-            </div>
+                    await printer.connect();
+                    setMessage("Printer connected.");
+                  } catch (error) {
+                    setMessage(
+                      error instanceof Error ? error.message : "Printer error.",
+                    );
+                  }
+                })
+              }
+              className="rounded-lg bg-neutral-900 px-3 py-1.5 text-xs font-medium text-neutral-300 transition hover:bg-neutral-800 hover:text-white active:scale-95 disabled:opacity-50"
+            >
+              {printer.connected ? "Printer on" : "Connect printer"}
+            </button>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => startTransition(async () => await logout())}
+              className="rounded-lg bg-neutral-900 px-3 py-1.5 text-xs font-medium text-neutral-300 transition hover:bg-neutral-800 hover:text-white active:scale-95 disabled:opacity-50"
+            >
+              {pending ? "Logging out..." : "Log out"}
+            </button>
           </div>
-        ) : null}
+        </header>
 
         {/* Void Modal */}
         {voidModalOpen ? (
@@ -383,20 +342,6 @@ export function PosClient({
           />
         ) : null}
 
-        {menuOpen ? (
-          <PosDrawer
-            session={session}
-            pos={pos}
-            menu={menu}
-            categories={categories}
-            promotions={promotions}
-            orders={orders}
-            printer={printer}
-            onClose={() => setMenuOpen(false)}
-            onReprint={reprintOrder}
-          />
-        ) : null}
-
         <div className="relative flex min-h-0 flex-1 flex-col md:flex-row">
           {!pos.isOpen ? (
             <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-neutral-100 px-6 text-center">
@@ -477,19 +422,6 @@ export function PosClient({
                 </button>
               ))}
             </div>
-
-            {pos.isOpen ? (
-              <button
-                type="button"
-                aria-label="Add product"
-                onClick={() => setAddingProduct(true)}
-                className="absolute right-5 bottom-16 z-10 flex h-12 w-12 items-center justify-center rounded-full bg-black text-white shadow-[0_10px_30px_rgba(0,0,0,0.28)] transition hover:scale-105"
-              >
-                <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor">
-                  <path d="M12 5v14M5 12h14" strokeWidth="2" />
-                </svg>
-              </button>
-            ) : null}
           </section>
 
           {/* Checkout Panel Sidebar */}
@@ -614,7 +546,7 @@ export function PosClient({
                 <div className="grid grid-cols-2 gap-1.5">
                   {activePromos.length === 0 ? (
                     <p className="col-span-2 text-center text-[11px] text-neutral-500">
-                      Add promotions in the menu drawer.
+                      No active promotions.
                     </p>
                   ) : (
                     activePromos.map((item) => (
