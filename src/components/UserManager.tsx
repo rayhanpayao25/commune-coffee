@@ -129,7 +129,7 @@ export function UserManager({ users, session }: UserManagerProps) {
               </h1>
             </div>
 
-            {activeSubTab === "add" || (editingId && editingId !== "new") ? (
+            {(activeSubTab === "add" || (editingId !== null && editingId !== "new")) ? (
               <form
                 className="space-y-4 border border-neutral-200 bg-white p-6 rounded-2xl shadow-sm transition-all w-full"
                 onSubmit={(event) => {
@@ -158,7 +158,9 @@ export function UserManager({ users, session }: UserManagerProps) {
                     const result =
                       editingId === "new"
                         ? await createStaffUser(payload)
-                        : await updateStaffUser({ id: editingId, ...payload });
+                        : editingId
+                          ? await updateStaffUser({ id: editingId, ...payload })
+                          : { error: "Account not found." };
 
                     if (result && "error" in result && result.error) {
                       setNotice(result.error);
