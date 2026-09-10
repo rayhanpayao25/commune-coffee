@@ -7,6 +7,7 @@ import {
   updateStaffUser,
 } from "@/actions/users";
 import type { PublicStaffUser } from "@/lib/users";
+import { phDateTimeLabel } from "@/lib/datetime";
 import type { LoginActivity, Session } from "@/lib/types";
 
 const field =
@@ -20,6 +21,60 @@ type UserManagerProps = {
 
 type SubTab = "manage" | "add" | "activity";
 type StaffRole = "Admin" | "Barista" | "Manager" | "Cashier";
+
+type CashierSession = {
+  id: string;
+  userId: string;
+  username: string;
+  name: string;
+  loginAt: string | null;
+  logoutAt: string | null;
+};
+
+function pairLoginSessions(records: LoginActivity[]): CashierSession[] {
+  const chronological = [...records].sort(
+    (a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id),
+  );
+  const openByUser = new Map<string, CashierSession[]>();
+  const sessions: CashierSession[] = [];
+
+  for (const record of chronological) {
+    const open = openByUser.get(record.userId) ?? [];
+    if (record.type === "login") {
+      const session: CashierSession = {
+        id: record.id,
+        userId: record.userId,
+        username: record.username,
+        name: record.name,
+        loginAt: record.at,
+        logoutAt: null,
+      };
+      sessions.push(session);
+      open.push(session);
+      openByUser.set(record.userId, open);
+    } else {
+      const unpaired = open.pop();
+      if (unpaired) {
+        unpaired.logoutAt = record.at;
+      } else {
+        sessions.push({
+          id: record.id,
+          userId: record.userId,
+          username: record.username,
+          name: record.name,
+          loginAt: null,
+          logoutAt: record.at,
+        });
+      }
+    }
+  }
+
+  return sessions.sort((a, b) => {
+    const aTime = a.loginAt ?? a.logoutAt ?? "";
+    const bTime = b.loginAt ?? b.logoutAt ?? "";
+    return bTime.localeCompare(aTime);
+  });
+}
 
 export function UserManager({ users, session, loginActivity }: UserManagerProps) {
   const [activeSubTab, setActiveSubTab] = useState<SubTab>("manage");
@@ -347,62 +402,40 @@ export function UserManager({ users, session, loginActivity }: UserManagerProps)
               </p>
             </div>
 
-            <div className="bg-white border border-neutral-200 rounded-2xl overflow-hidden shadow-sm w-full">
-              <div className="px-4 py-3 border-b border-neutral-100 bg-neutral-50/50 sm:px-6">
-                <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">
-                  Cashier login activity
-                </p>
-              </div>
-              <div className="divide-y divide-neutral-100">
-                {loginActivity.length === 0 ? (
-                  <p className="p-6 text-center text-xs text-neutral-400">
-                    No cashier login or logout yet.
-                  </p>
-                ) : (
-                  loginActivity.map((record) => {
-                    const at = new Date(record.at);
-                    const when = at.toLocaleString("en-US", {
-                      timeZone: "Asia/Manila",
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      hour12: true,
-                    });
-                    const isLogin = record.type === "login";
-                    return (
-                      <div
-                        key={record.id}
-                        className="flex flex-col gap-2 px-4 py-4 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-6"
-                      >
-                        <div className="min-w-0">
-                          <span className="font-semibold text-neutral-900">
-                            {record.name}
-                          </span>
-                          <span className="mx-2 text-neutral-300">·</span>
-                          <span className="text-xs text-neutral-400">
-                            {record.username}
-                          </span>
-                          <span className="mx-2 text-neutral-300">·</span>
-                          <span
-                            className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${
-                              isLogin
-                                ? "bg-black text-white"
-                                : "bg-neutral-100 text-neutral-600"
-                            }`}
-                          >
-                            {isLogin ? "Login" : "Logout"}
-                          </span>
-                        </div>
-                        <span className="text-xs font-medium text-neutral-500">
-                          {when}
-                        </span>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
+            <div className="overflow-x-auto rounded-2xl border border-neutral-200 bg-white shadow-sm w-full">
+              <table className="w-full min-w-[560px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-black bg-black text-white text-xs font-semibold uppercase tracking-wider">
+                    <th className="px-4 py-3 sm:px-6">Cashier</th>
+                    <th className="px-4 py-3 sm:px-6">Login</th>
+                    <th className="px-4 py-3 sm:px-6">Logout</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loginActivity.length === 0 ? (
+                    <tr>
+                      <td colSpan={3} className="px-4 py-8 text-center text-xs text-neutral-400 sm:px-6">
+                        No cashier login or logout yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    pairLoginSessions(loginActivity).map((row) => (
+                      <tr key={row.id} className="border-b border-neutral-100 last:border-0">
+                        <td className="px-4 py-3 sm:px-6">
+                          <p className="font-semibold text-neutral-900">{row.name}</p>
+                          <p className="text-xs text-neutral-400">{row.username}</p>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-neutral-700 sm:px-6">
+                          {row.loginAt ? phDateTimeLabel(row.loginAt) : "—"}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-neutral-700 sm:px-6">
+                          {row.logoutAt ? phDateTimeLabel(row.logoutAt) : "Still in"}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
