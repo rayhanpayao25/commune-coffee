@@ -123,6 +123,16 @@ export type LoginActivity = {
   at: string;
 };
 
+export type OffRequest = {
+  id: string;
+  userId: string;
+  name: string;
+  date: string;
+  reason: string;
+  status: "pending" | "approved" | "denied";
+  createdAt: string;
+};
+
 export type StoreData = {
   pos: PosState;
   orders: Order[];
@@ -136,4 +146,5 @@ export type StoreData = {
   restocks: RestockRecord[];
   costings: CostingItem[];
   loginActivity: LoginActivity[];
+  offRequests: OffRequest[];
 };

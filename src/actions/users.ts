@@ -9,12 +9,13 @@ import {
   sessionCookieOptions,
 } from "@/lib/auth";
 import { updateStore } from "@/lib/store";
+import { phDateString } from "@/lib/datetime";
 import {
   parseRole,
   staffUserId,
   toSession,
 } from "@/lib/users";
-import type { Role, StaffUser } from "@/lib/types";
+import type { OffRequest, Role, StaffUser } from "@/lib/types";
 
 async function requireAdmin() {
   const session = await getSession();
@@ -26,6 +27,7 @@ async function requireAdmin() {
 
 function refresh() {
   revalidatePath("/admin");
+  revalidatePath("/pos");
   revalidatePath("/login");
 }
 
@@ -206,6 +208,94 @@ export async function deleteStaffUser(id: string) {
     store.users = store.users.filter((entry) => entry.id !== id);
   });
   if (error) return { error };
+  refresh();
+  return { ok: true };
+}
+
+export async function punchStaff(userId: string, type: "login" | "logout") {
+  await requireAdmin();
+  let error: string | undefined;
+  await updateStore((store) => {
+    const user = store.users.find((entry) => entry.id === userId);
+    if (!user || user.role === "admin") {
+      error = "Pick a staff member.";
+      return;
+    }
+    if (!Array.isArray(store.loginActivity)) store.loginActivity = [];
+    store.loginActivity.unshift({
+      id: `auth-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+      userId: user.id,
+      username: user.username,
+      name: user.name,
+      role: user.role,
+      type,
+      at: new Date().toISOString(),
+    });
+    if (store.loginActivity.length > 300) store.loginActivity.length = 300;
+  });
+  if (error) return { error };
+  refresh();
+  return { ok: true };
+}
+
+export async function createOffRequest(input: { userId?: string; date: string; reason: string }) {
+  const session = await getSession();
+  if (!session) return { error: "Sign in first." };
+  const date = phDateString(input.date);
+  const reason = input.reason.trim();
+  if (!date) return { error: "Pick a date." };
+  if (!reason) return { error: "Enter a reason." };
+
+  const asAdmin = session.role === "admin";
+  if (!asAdmin && session.role !== "cashier" && session.role !== "manager") {
+    return { error: "Only staff can request off." };
+  }
+
+  let error: string | undefined;
+  await updateStore((store) => {
+    const userId = asAdmin ? input.userId : session.userId;
+    const user = store.users.find((entry) => entry.id === userId);
+    if (!user || user.role === "admin") {
+      error = "Pick a staff member.";
+      return;
+    }
+    if (!Array.isArray(store.offRequests)) store.offRequests = [];
+    store.offRequests.unshift({
+      id: `off-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+      userId: user.id,
+      name: user.name,
+      date,
+      reason,
+      status: asAdmin ? "approved" : "pending",
+      createdAt: new Date().toISOString(),
+    });
+  });
+  if (error) return { error };
+  refresh();
+  return { ok: true };
+}
+
+export async function setOffRequestStatus(id: string, status: OffRequest["status"]) {
+  await requireAdmin();
+  let error: string | undefined;
+  await updateStore((store) => {
+    const request = store.offRequests?.find((entry) => entry.id === id);
+    if (!request) {
+      error = "Request not found.";
+      return;
+    }
+    request.status = status;
+  });
+  if (error) return { error };
+  refresh();
+  return { ok: true };
+}
+
+export async function deleteOffRequest(id: string) {
+  await requireAdmin();
+  await updateStore((store) => {
+    store.offRequests = (store.offRequests ?? []).filter((entry) => entry.id !== id);
+  });
   refresh();
   return { ok: true };
 }

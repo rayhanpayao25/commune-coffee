@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { logout } from "@/actions/auth";
 import { createOrder, openPos, verifyManager, voidOrder } from "@/actions/pos";
+import { createOffRequest } from "@/actions/users";
 import { ReceiptPreview } from "@/components/ReceiptPreview";
 import { formatMoney } from "@/lib/menu";
 import { phDateString, phDateTimeLabel } from "@/lib/datetime";
@@ -215,6 +216,9 @@ export function PosClient({
   const printer = useReceiptPrinter();
   const [checkoutReady, setCheckoutReady] = useState(false);
   const [swipeOpenId, setSwipeOpenId] = useState<string | null>(null);
+  const [offOpen, setOffOpen] = useState(false);
+  const [offDate, setOffDate] = useState(phDateString());
+  const [offReason, setOffReason] = useState("");
   const activePromos = promotions.filter((item) => item.active);
 
   // Helper function to normalize category strings (combines "Non Coffee" and "Non-Coffee")
@@ -434,6 +438,17 @@ export function PosClient({
           <div className="flex items-center gap-2">
             <button
               type="button"
+              onClick={() => {
+                setOffDate(phDateString());
+                setOffReason("");
+                setOffOpen(true);
+              }}
+              className="rounded-lg bg-neutral-900 px-3 py-1.5 text-xs font-medium text-neutral-300 transition hover:bg-neutral-800 hover:text-white"
+            >
+              Request off
+            </button>
+            <button
+              type="button"
               disabled={pending || !printer.supported}
               onClick={() =>
                 startTransition(async () => {
@@ -472,6 +487,64 @@ export function PosClient({
             </button>
           </div>
         </header>
+
+        {offOpen ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+            <form
+              className="w-full max-w-sm space-y-4 rounded-3xl bg-white p-6"
+              onSubmit={(event) => {
+                event.preventDefault();
+                startTransition(async () => {
+                  const result = await createOffRequest({ date: offDate, reason: offReason });
+                  if (result && "error" in result && result.error) {
+                    setMessage(typeof result.error === "string" ? result.error : "Could not send request.");
+                    return;
+                  }
+                  setOffOpen(false);
+                  setOffReason("");
+                  setMessage("Off request sent.");
+                });
+              }}
+            >
+              <h2 className="text-lg font-semibold">Request off</h2>
+              <label className="block text-xs font-medium text-neutral-600">
+                <span className="mb-1.5 block">Date</span>
+                <input
+                  type="date"
+                  value={offDate}
+                  onChange={(event) => setOffDate(event.target.value)}
+                  className="w-full rounded-xl border border-neutral-200 px-3 py-2.5 text-sm outline-none focus:border-black"
+                  required
+                />
+              </label>
+              <label className="block text-xs font-medium text-neutral-600">
+                <span className="mb-1.5 block">Reason</span>
+                <input
+                  value={offReason}
+                  onChange={(event) => setOffReason(event.target.value)}
+                  className="w-full rounded-xl border border-neutral-200 px-3 py-2.5 text-sm outline-none focus:border-black"
+                  required
+                />
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setOffOpen(false)}
+                  className="rounded-xl border border-neutral-300 py-2.5 text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={pending}
+                  className="rounded-xl bg-black py-2.5 text-sm font-medium text-white disabled:opacity-40"
+                >
+                  Send
+                </button>
+              </div>
+            </form>
+          </div>
+        ) : null}
 
         {/* Void Modal */}
         {voidModalOpen ? (

@@ -154,6 +154,7 @@ function emptyStore(): StoreData {
     restocks: [],
     costings: structuredClone(DEFAULT_COSTINGS),
     loginActivity: [],
+    offRequests: [],
   };
 }
 
@@ -231,6 +232,9 @@ function normalizeStore(store: StoreData): StoreData {
   }
   if (!Array.isArray(store.loginActivity)) {
     store.loginActivity = [];
+  }
+  if (!Array.isArray(store.offRequests)) {
+    store.offRequests = [];
   }
 
   const matchaInventory = store.inventory.find((item) => /matcha/i.test(item.name));

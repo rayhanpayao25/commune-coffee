@@ -2,14 +2,12 @@
 
 import { useState, useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { StaffHeader, type AdminSection } from "@/components/StaffHeader";
+import { StaffHeader, type AdminPanel } from "@/components/StaffHeader";
 import { UserManager } from "@/components/UserManager";
 import { SalePurchaseTransactions } from "@/components/SalePurchaseTransactions";
 import { MenuCatalog } from "@/components/MenuCatalog";
 import type { PublicStaffUser } from "@/lib/users";
 import type { Session, StoreData } from "@/lib/types";
-
-type AdminPanel = "sales" | "menu" | "transactions";
 
 type AdminShellProps = {
   session: Session;
@@ -18,99 +16,53 @@ type AdminShellProps = {
   children: ReactNode;
 };
 
+function readSavedPanel(): AdminPanel {
+  const savedPanel = window.localStorage.getItem("admin_activePanel");
+  const savedSection = window.localStorage.getItem("admin_section");
+  if (savedPanel === "staff" || savedSection === "staff") return "staff";
+  if (savedPanel === "menu" || savedPanel === "transactions") return savedPanel;
+  return "sales";
+}
+
 export function AdminShell({ session, users, store, children }: AdminShellProps) {
-  const [section, setSection] = useState<AdminSection>("admin");
   const [panel, setPanel] = useState<AdminPanel>("sales");
   const [isMounted, setIsMounted] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
-    if (section !== "admin" || panel !== "transactions") return;
+    if (panel !== "transactions") return;
     const refreshTimer = window.setInterval(() => router.refresh(), 5000);
     return () => window.clearInterval(refreshTimer);
-  }, [section, panel, router]);
+  }, [panel, router]);
 
   useEffect(() => {
+    setPanel(readSavedPanel());
     setIsMounted(true);
-    const savedSection = window.localStorage.getItem("admin_section") as AdminSection | null;
-    const savedPanel = window.localStorage.getItem("admin_activePanel");
-
-    if (savedSection === "staff" || savedPanel === "staff") {
-      setSection("staff");
-      return;
-    }
-
-    if (savedSection === "admin") {
-      setSection("admin");
-    }
-    if (savedPanel === "transactions" || savedPanel === "menu") {
-      setPanel(savedPanel);
-    }
   }, []);
 
-  function handleSectionChange(next: AdminSection) {
-    setSection(next);
-    window.localStorage.setItem("admin_section", next);
-    if (next === "staff") {
-      window.localStorage.setItem("admin_activePanel", "staff");
-    }
+  function handlePanelChange(next: AdminPanel) {
+    setPanel(next);
+    window.localStorage.setItem("admin_activePanel", next);
+    window.localStorage.setItem("admin_section", next === "staff" ? "staff" : "admin");
   }
 
-  function handleTabChange(id: AdminPanel) {
-    setPanel(id);
-    window.localStorage.setItem("admin_activePanel", id);
-    window.localStorage.setItem("admin_section", "admin");
-  }
+  const current = isMounted ? panel : "sales";
 
   return (
     <>
-      <StaffHeader
-        session={session}
-        section={isMounted ? section : "admin"}
-        onSectionChange={handleSectionChange}
-      />
+      <StaffHeader session={session} panel={current} onPanelChange={handlePanelChange} />
 
-      {isMounted && section === "staff" ? (
+      {current === "staff" ? (
         <UserManager
           users={users}
           session={session}
           loginActivity={store.loginActivity ?? []}
+          offRequests={store.offRequests ?? []}
         />
-      ) : (
-        <>
-          <div className="border-b border-neutral-200 bg-white px-3 py-2 sm:px-6">
-            <div className="flex gap-1 overflow-x-auto">
-              {(
-                [
-                  ["sales", "Sales"],
-                  ["menu", "Menu"],
-                  ["transactions", "Inventory"],
-                ] as const
-              ).map(([id, label]) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => handleTabChange(id)}
-                  className={`rounded-lg px-4 py-2 text-sm whitespace-nowrap ${
-                    isMounted && panel === id
-                      ? "bg-black text-white"
-                      : "text-neutral-600 hover:text-black"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-          {!isMounted || panel === "sales" ? children : null}
-          {isMounted && panel === "menu" ? (
-            <MenuCatalog menu={store.menu} categories={store.categories} />
-          ) : null}
-          {isMounted && panel === "transactions" ? (
-            <SalePurchaseTransactions store={store} />
-          ) : null}
-        </>
-      )}
+      ) : null}
+      {current === "sales" ? children : null}
+      {current === "menu" ? <MenuCatalog menu={store.menu} categories={store.categories} /> : null}
+      {current === "transactions" ? <SalePurchaseTransactions store={store} /> : null}
     </>
   );
 }

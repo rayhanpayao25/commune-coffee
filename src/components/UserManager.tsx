@@ -1,28 +1,33 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import {
+  createOffRequest,
   createStaffUser,
+  deleteOffRequest,
   deleteStaffUser,
+  punchStaff,
+  setOffRequestStatus,
   updateStaffUser,
 } from "@/actions/users";
 import type { PublicStaffUser } from "@/lib/users";
-import { phDateTimeLabel } from "@/lib/datetime";
-import type { LoginActivity, Session } from "@/lib/types";
+import { phDateString, phDateTimeLabel } from "@/lib/datetime";
+import type { LoginActivity, OffRequest, Session } from "@/lib/types";
 
 const field =
-  "w-full rounded-xl border border-neutral-200 bg-neutral-50/50 px-3.5 py-2.5 text-sm text-neutral-900 outline-none transition-all focus:border-neutral-900 focus:bg-white focus:ring-1 focus:ring-neutral-900";
+  "w-full rounded-xl border border-neutral-200 bg-white px-3.5 py-2.5 text-sm text-neutral-900 outline-none transition-all focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900";
 
 type UserManagerProps = {
   users: PublicStaffUser[];
   session: Session;
   loginActivity: LoginActivity[];
+  offRequests: OffRequest[];
 };
 
-type SubTab = "manage" | "add" | "activity";
+type SubTab = "staff" | "inout" | "off";
 type StaffRole = "Admin" | "Barista" | "Manager" | "Cashier";
 
-type CashierSession = {
+type StaffSession = {
   id: string;
   userId: string;
   username: string;
@@ -31,17 +36,17 @@ type CashierSession = {
   logoutAt: string | null;
 };
 
-function pairLoginSessions(records: LoginActivity[]): CashierSession[] {
+function pairLoginSessions(records: LoginActivity[]): StaffSession[] {
   const chronological = [...records].sort(
     (a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id),
   );
-  const openByUser = new Map<string, CashierSession[]>();
-  const sessions: CashierSession[] = [];
+  const openByUser = new Map<string, StaffSession[]>();
+  const sessions: StaffSession[] = [];
 
   for (const record of chronological) {
     const open = openByUser.get(record.userId) ?? [];
     if (record.type === "login") {
-      const session: CashierSession = {
+      const session: StaffSession = {
         id: record.id,
         userId: record.userId,
         username: record.username,
@@ -76,18 +81,28 @@ function pairLoginSessions(records: LoginActivity[]): CashierSession[] {
   });
 }
 
-export function UserManager({ users, session, loginActivity }: UserManagerProps) {
-  const [activeSubTab, setActiveSubTab] = useState<SubTab>("manage");
+export function UserManager({ users, session, loginActivity, offRequests }: UserManagerProps) {
+  const [tab, setTab] = useState<SubTab>("staff");
   const [editingId, setEditingId] = useState<string | "new" | null>(null);
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [role, setRole] = useState<StaffRole>("Cashier");
-  const [title, setTitle] = useState(""); 
+  const [title, setTitle] = useState("");
   const [password, setPassword] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [punchUserId, setPunchUserId] = useState("");
+  const [offUserId, setOffUserId] = useState("");
+  const [offDate, setOffDate] = useState(phDateString());
+  const [offReason, setOffReason] = useState("");
 
   const editing = users.find((user) => user.id === editingId) ?? null;
+  const floorStaff = users.filter((user) => user.role !== "admin");
+  const sessions = useMemo(() => pairLoginSessions(loginActivity), [loginActivity]);
+  const requests = useMemo(
+    () => [...offRequests].sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt)),
+    [offRequests],
+  );
 
   function startCreate() {
     setEditingId("new");
@@ -97,6 +112,7 @@ export function UserManager({ users, session, loginActivity }: UserManagerProps)
     setTitle("");
     setPassword("");
     setNotice(null);
+    setTab("staff");
   }
 
   function startEdit(user: PublicStaffUser) {
@@ -104,20 +120,16 @@ export function UserManager({ users, session, loginActivity }: UserManagerProps)
     setName(user.name);
     setUsername(user.username);
     setTitle(user.title ?? "");
-    
     const lowerRole = user.role.toLowerCase();
-    let mappedRole: StaffRole = "Barista";
-    if (lowerRole === "admin") {
-      mappedRole = "Admin";
-    } else if (lowerRole === "manager") {
-      mappedRole = "Manager";
-    } else if (lowerRole === "cashier") {
-      mappedRole = "Cashier";
-    } else if (lowerRole === "barista") {
-      mappedRole = "Barista";
-    }
-
-    setRole(mappedRole);
+    setRole(
+      lowerRole === "admin"
+        ? "Admin"
+        : lowerRole === "manager"
+          ? "Manager"
+          : lowerRole === "cashier"
+            ? "Cashier"
+            : "Barista",
+    );
     setPassword("");
     setNotice(null);
   }
@@ -128,49 +140,49 @@ export function UserManager({ users, session, loginActivity }: UserManagerProps)
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50/30 w-full">
-      <div className="flex w-full gap-4 overflow-x-auto border-b border-neutral-200 bg-white px-4 text-sm sm:gap-8 sm:px-6">
+    <div className="min-h-screen w-full bg-neutral-50/30">
+      <div className="flex w-full gap-1 overflow-x-auto border-b border-neutral-200 bg-white px-4 sm:px-6">
         {(
           [
-            { id: "manage", label: "Manage User" },
-            { id: "add", label: "Add Staff" },
-            { id: "activity", label: "Activity login for cashier" },
+            { id: "staff", label: "Staff" },
+            { id: "inout", label: "In / Off" },
+            { id: "off", label: "Request off" },
           ] as const
-        ).map((tab) => (
+        ).map((entry) => (
           <button
-            key={tab.id}
+            key={entry.id}
             type="button"
-            onClick={() => {
-              setActiveSubTab(tab.id);
-              if (tab.id === "add") {
-                startCreate();
-              } else if (tab.id === "manage" && editingId === "new") {
-                resetForm();
-              }
-            }}
-            className={`relative shrink-0 py-3 font-medium whitespace-nowrap transition-all ${
-              activeSubTab === tab.id
-                ? "text-neutral-900 border-b-2 border-neutral-900 -mb-px"
-                : "text-neutral-400 hover:text-neutral-600"
+            onClick={() => setTab(entry.id)}
+            className={`shrink-0 px-3 py-3 text-sm font-medium ${
+              tab === entry.id
+                ? "-mb-px border-b-2 border-black text-black"
+                : "text-neutral-400 hover:text-neutral-700"
             }`}
           >
-            {tab.label}
+            {entry.label}
           </button>
         ))}
       </div>
 
-      <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
-        {(activeSubTab === "manage" || activeSubTab === "add") && (
-          <div className="space-y-6 w-full">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-neutral-900 sm:text-3xl">
-                {activeSubTab === "add" ? "Add staff" : "Manage users"}
-              </h1>
+      <div className="w-full space-y-5 px-4 py-6 sm:px-6">
+        {notice ? <p className="text-sm text-neutral-600">{notice}</p> : null}
+
+        {tab === "staff" ? (
+          <>
+            <div className="flex items-center justify-between gap-3">
+              <h1 className="text-xl font-semibold tracking-tight">Staff</h1>
+              <button
+                type="button"
+                onClick={startCreate}
+                className="rounded-full bg-black px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+              >
+                Add staff
+              </button>
             </div>
 
-            {(activeSubTab === "add" || (editingId !== null && editingId !== "new")) ? (
+            {editingId ? (
               <form
-                className="space-y-4 border border-neutral-200 bg-white p-4 rounded-2xl shadow-sm transition-all w-full sm:p-6"
+                className="space-y-4 rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5"
                 onSubmit={(event) => {
                   event.preventDefault();
                   startTransition(async () => {
@@ -190,164 +202,103 @@ export function UserManager({ users, session, loginActivity }: UserManagerProps)
                           role: role.toLowerCase(),
                           password,
                         };
-
                     const result =
                       editingId === "new"
                         ? await createStaffUser(payload)
-                        : editingId
-                          ? await updateStaffUser({ id: editingId, ...payload })
-                          : { error: "Account not found." };
-
+                        : await updateStaffUser({ id: editingId, ...payload });
                     if (result && "error" in result && result.error) {
-                      setNotice(result.error);
+                      setNotice(typeof result.error === "string" ? result.error : "Could not save.");
                       return;
                     }
                     if (editingId === "new") {
                       startCreate();
-                    } else {
-                      resetForm();
-                      setNotice("Account updated successfully.");
+                      setEditingId(null);
+                      setNotice("Staff added.");
+                      return;
                     }
+                    resetForm();
+                    setNotice("Account updated.");
                   });
                 }}
               >
-                <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
-                  <p className="text-xs font-semibold tracking-wider text-neutral-400 uppercase">
-                    {editingId === "new"
-                      ? role === "Barista"
-                        ? "New barista"
-                        : "New Account"
-                      : `Edit ${role === "Barista" ? "barista" : "account"}: ${editing?.name ?? ""}`}
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">
+                    {editingId === "new" ? "New staff" : `Edit ${editing?.name ?? ""}`}
                   </p>
+                  <button type="button" onClick={resetForm} className="text-xs text-neutral-500 hover:text-black">
+                    Cancel
+                  </button>
                 </div>
-                
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-3 sm:grid-cols-2">
                   <label className={`text-xs font-medium text-neutral-600 ${role === "Barista" ? "sm:col-span-2" : ""}`}>
                     <span className="mb-1.5 block">Name</span>
-                    <input
-                      value={name}
-                      onChange={(event) => setName(event.target.value)}
-                      className={field}
-                      placeholder="Full Name"
-                      required
-                    />
+                    <input value={name} onChange={(event) => setName(event.target.value)} className={field} required />
                   </label>
                   {role === "Barista" ? (
                     <p className="sm:col-span-2 text-xs text-neutral-500">
-                      Baristas are added by name only. No username or password — they cannot log in.
+                      Baristas are name-only. They cannot log in.
                     </p>
                   ) : (
                     <>
-                  <label className="text-xs font-medium text-neutral-600">
-                    <span className="mb-1.5 block">Username</span>
-                    <input
-                      value={username}
-                      onChange={(event) => setUsername(event.target.value)}
-                      className={field}
-                      placeholder="login name"
-                      autoComplete="off"
-                      required
-                    />
-                  </label>
-
-                  <label className="text-xs font-medium text-neutral-600 sm:col-span-2">
-                    <span className="mb-1.5 block">Title</span>
-                    <input
-                      value={title}
-                      onChange={(event) => setTitle(event.target.value)}
-                      className={field}
-                      placeholder="Manager, Cashier"
-                    />
-                  </label>
-
-                  <label className="text-xs font-medium text-neutral-600 sm:col-span-2">
-                    <span className="mb-1.5 block">Password</span>
-                    <input
-                      type="password"
-                      value={password}
-                      onChange={(event) => setPassword(event.target.value)}
-                      className={field}
-                      placeholder="at least 4 characters"
-                      autoComplete="new-password"
-                      required={editingId === "new"}
-                    />
-                  </label>
+                      <label className="text-xs font-medium text-neutral-600">
+                        <span className="mb-1.5 block">Username</span>
+                        <input value={username} onChange={(event) => setUsername(event.target.value)} className={field} required />
+                      </label>
+                      <label className="text-xs font-medium text-neutral-600">
+                        <span className="mb-1.5 block">Title</span>
+                        <input value={title} onChange={(event) => setTitle(event.target.value)} className={field} />
+                      </label>
+                      <label className="text-xs font-medium text-neutral-600">
+                        <span className="mb-1.5 block">Password</span>
+                        <input
+                          type="password"
+                          value={password}
+                          onChange={(event) => setPassword(event.target.value)}
+                          className={field}
+                          required={editingId === "new"}
+                        />
+                      </label>
                     </>
                   )}
                 </div>
-
-                <div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    {(["Admin", "Manager", "Cashier", "Barista"] as const).map((id) => (
-                      <button
-                        key={id}
-                        type="button"
-                        onClick={() => setRole(id)}
-                        className={`rounded-xl border py-2.5 text-xs font-semibold tracking-wide transition-all ${
-                          role === id
-                            ? "border-neutral-900 bg-neutral-900 text-white shadow-sm"
-                            : "border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300"
-                        }`}
-                      >
-                        {id}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {notice ? <p className="text-xs font-medium text-red-600">{notice}</p> : null}
-
-                <div className="flex items-center gap-3 pt-2">
-                  <button
-                    type="submit"
-                    disabled={pending}
-                    className="rounded-xl bg-neutral-900 px-6 py-2.5 text-xs font-semibold uppercase tracking-wider text-white shadow-sm hover:bg-neutral-800 disabled:opacity-40 transition-all"
-                  >
-                    {editingId === "new" ? "Add" : "Save Changes"}
-                  </button>
-                  {activeSubTab === "manage" ? (
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {(["Admin", "Manager", "Cashier", "Barista"] as const).map((id) => (
                     <button
+                      key={id}
                       type="button"
-                      onClick={resetForm}
-                      className="rounded-xl border border-neutral-200 bg-white px-6 py-2.5 text-xs font-semibold uppercase tracking-wider text-neutral-600 hover:bg-neutral-50 transition-all"
+                      onClick={() => setRole(id)}
+                      className={`rounded-full border py-2 text-xs font-medium ${
+                        role === id ? "border-black bg-black text-white" : "border-neutral-200 bg-white text-neutral-600"
+                      }`}
                     >
-                      Cancel
+                      {id}
                     </button>
-                  ) : null}
+                  ))}
                 </div>
+                <button
+                  type="submit"
+                  disabled={pending}
+                  className="rounded-full bg-black px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-40"
+                >
+                  {editingId === "new" ? "Add" : "Save"}
+                </button>
               </form>
             ) : null}
 
-            {activeSubTab === "add" && notice ? (
-              <p className="text-xs font-medium text-neutral-600 bg-neutral-100 p-3 rounded-xl">{notice}</p>
-            ) : null}
-
-            {activeSubTab === "manage" && !editingId && notice ? (
-              <p className="text-xs font-medium text-neutral-600 bg-neutral-100 p-3 rounded-xl">{notice}</p>
-            ) : null}
-
-            {activeSubTab === "manage" ? (
-            <div className="bg-white border border-neutral-200 rounded-2xl overflow-hidden shadow-sm divide-y divide-neutral-100 w-full">
+            <div className="divide-y divide-neutral-100 overflow-hidden rounded-2xl border border-neutral-200 bg-white">
               {users.map((user) => (
-                <div
-                  key={user.id}
-                  className="flex items-center justify-between gap-3 px-4 py-4 transition-all hover:bg-neutral-50/50 sm:px-6"
-                >
-                  <div className="min-w-0 flex-1 pr-4">
+                <div key={user.id} className="flex items-center justify-between gap-3 px-4 py-4 sm:px-5">
+                  <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="text-sm font-semibold text-neutral-900 truncate">
-                        {user.name}
-                      </p>
+                      <p className="truncate text-sm font-medium">{user.name}</p>
                       {user.id === session.userId ? (
-                        <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-semibold text-neutral-500 uppercase">
+                        <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium text-neutral-500 uppercase">
                           you
                         </span>
                       ) : null}
                     </div>
-                    <p className="text-xs text-neutral-400 mt-0.5">
-                      {user.role === "barista"
-                        ? "Barista"
-                        : `${user.username} · ${user.title || user.role}`}
+                    <p className="mt-0.5 text-xs text-neutral-400">
+                      {user.role === "barista" ? "Barista" : `${user.username} · ${user.title || user.role}`}
                     </p>
                   </div>
                   <div className="flex items-center gap-1">
@@ -355,14 +306,10 @@ export function UserManager({ users, session, loginActivity }: UserManagerProps)
                       type="button"
                       aria-label={`Edit ${user.name}`}
                       onClick={() => startEdit(user)}
-                      className="flex h-9 w-9 items-center justify-center rounded-xl text-neutral-400 hover:bg-neutral-100 hover:text-neutral-900 transition-all"
+                      className="flex h-9 w-9 items-center justify-center rounded-xl text-neutral-400 hover:bg-neutral-100 hover:text-black"
                     >
                       <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor">
-                        <path
-                          d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3Z"
-                          strokeWidth="1.7"
-                          strokeLinejoin="round"
-                        />
+                        <path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3Z" strokeWidth="1.7" strokeLinejoin="round" />
                         <path d="M13.5 6.5l3 3" strokeWidth="1.7" />
                       </svg>
                     </button>
@@ -373,15 +320,15 @@ export function UserManager({ users, session, loginActivity }: UserManagerProps)
                       onClick={() =>
                         startTransition(async () => {
                           const result = await deleteStaffUser(user.id);
-                          if ("error" in result) {
-                            setNotice(result.error ?? "Could not delete.");
+                          if (result && "error" in result && result.error) {
+                            setNotice(typeof result.error === "string" ? result.error : "Could not delete.");
                             return;
                           }
                           if (editingId === user.id) resetForm();
-                          setNotice("Account deleted.");
+                          setNotice("Staff deleted.");
                         })
                       }
-                      className="flex h-9 w-9 items-center justify-center rounded-xl text-neutral-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-30 transition-all"
+                      className="flex h-9 w-9 items-center justify-center rounded-xl text-neutral-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-30"
                     >
                       <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor">
                         <path d="M5 7h14M10 7V5h4v2M8 7l1 12h6l1-12" strokeWidth="1.7" />
@@ -391,49 +338,206 @@ export function UserManager({ users, session, loginActivity }: UserManagerProps)
                 </div>
               ))}
             </div>
-            ) : null}
-          </div>
-        )}
+          </>
+        ) : null}
 
-        {activeSubTab === "activity" && (
-          <div className="space-y-6 w-full">
+        {tab === "inout" ? (
+          <>
             <div>
-              <h1 className="mt-1 text-2xl font-bold tracking-tight text-neutral-900 sm:text-3xl">
-                Activity login for cashier
-              </h1>
-              <p className="mt-1 text-sm text-neutral-500">
-                Login and logout times for cashiers on the POS.
-              </p>
+              <h1 className="text-xl font-semibold tracking-tight">Staff in / off</h1>
+              <p className="mt-1 text-sm text-neutral-500">Clock in and out times for cashiers, managers, and baristas.</p>
             </div>
-
-            <div className="overflow-x-auto rounded-2xl border border-neutral-200 bg-white shadow-sm w-full">
-              <table className="w-full min-w-[560px] text-left text-sm">
+            <form
+              className="flex flex-col gap-2 rounded-2xl border border-neutral-200 bg-white p-3 sm:flex-row sm:items-center"
+              onSubmit={(event) => event.preventDefault()}
+            >
+              <select
+                value={punchUserId}
+                onChange={(event) => setPunchUserId(event.target.value)}
+                className={`${field} sm:max-w-xs`}
+              >
+                <option value="">Select staff</option>
+                {floorStaff.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.name}
+                  </option>
+                ))}
+              </select>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={pending || !punchUserId}
+                  onClick={() =>
+                    startTransition(async () => {
+                      const result = await punchStaff(punchUserId, "login");
+                      if (result && "error" in result && result.error) {
+                        setNotice(typeof result.error === "string" ? result.error : "Could not record.");
+                        return;
+                      }
+                      setNotice("Marked in.");
+                    })
+                  }
+                  className="rounded-full bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
+                >
+                  In
+                </button>
+                <button
+                  type="button"
+                  disabled={pending || !punchUserId}
+                  onClick={() =>
+                    startTransition(async () => {
+                      const result = await punchStaff(punchUserId, "logout");
+                      if (result && "error" in result && result.error) {
+                        setNotice(typeof result.error === "string" ? result.error : "Could not record.");
+                        return;
+                      }
+                      setNotice("Marked off.");
+                    })
+                  }
+                  className="rounded-full border border-neutral-300 px-4 py-2 text-sm font-medium hover:border-black disabled:opacity-40"
+                >
+                  Off
+                </button>
+              </div>
+            </form>
+            <div className="overflow-x-auto rounded-2xl border border-neutral-200 bg-white">
+              <table className="w-full min-w-[520px] text-left text-sm">
                 <thead>
-                  <tr className="border-b border-black bg-black text-white text-xs font-semibold uppercase tracking-wider">
-                    <th className="px-4 py-3 sm:px-6">Cashier</th>
-                    <th className="px-4 py-3 sm:px-6">Login</th>
-                    <th className="px-4 py-3 sm:px-6">Logout</th>
+                  <tr className="border-b border-neutral-200 text-xs font-medium tracking-wide text-neutral-400 uppercase">
+                    <th className="px-4 py-3">Staff</th>
+                    <th className="px-4 py-3">In</th>
+                    <th className="px-4 py-3">Off</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {loginActivity.length === 0 ? (
+                  {sessions.length === 0 ? (
                     <tr>
-                      <td colSpan={3} className="px-4 py-8 text-center text-xs text-neutral-400 sm:px-6">
-                        No cashier login or logout yet.
+                      <td colSpan={3} className="px-4 py-8 text-center text-sm text-neutral-400">
+                        No in / off records yet.
                       </td>
                     </tr>
                   ) : (
-                    pairLoginSessions(loginActivity).map((row) => (
-                      <tr key={row.id} className="border-b border-neutral-100 last:border-0">
-                        <td className="px-4 py-3 sm:px-6">
-                          <p className="font-semibold text-neutral-900">{row.name}</p>
+                    sessions.map((row) => (
+                      <tr key={row.id} className="border-t border-neutral-100">
+                        <td className="px-4 py-3">
+                          <p className="font-medium">{row.name}</p>
                           <p className="text-xs text-neutral-400">{row.username}</p>
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-neutral-700 sm:px-6">
-                          {row.loginAt ? phDateTimeLabel(row.loginAt) : "—"}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-neutral-700 sm:px-6">
-                          {row.logoutAt ? phDateTimeLabel(row.logoutAt) : "Still in"}
+                        <td className="px-4 py-3 whitespace-nowrap">{row.loginAt ? phDateTimeLabel(row.loginAt) : "—"}</td>
+                        <td className="px-4 py-3 whitespace-nowrap">{row.logoutAt ? phDateTimeLabel(row.logoutAt) : "Still in"}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : null}
+
+        {tab === "off" ? (
+          <>
+            <div>
+              <h1 className="text-xl font-semibold tracking-tight">Request off</h1>
+              <p className="mt-1 text-sm text-neutral-500">Day-off requests. POS staff can send these; you can also add or approve them here.</p>
+            </div>
+            <form
+              className="grid gap-3 rounded-2xl border border-neutral-200 bg-white p-4 sm:grid-cols-4 sm:items-end"
+              onSubmit={(event) => {
+                event.preventDefault();
+                startTransition(async () => {
+                  const result = await createOffRequest({ userId: offUserId, date: offDate, reason: offReason });
+                  if (result && "error" in result && result.error) {
+                    setNotice(typeof result.error === "string" ? result.error : "Could not save.");
+                    return;
+                  }
+                  setOffReason("");
+                  setNotice("Off request saved.");
+                });
+              }}
+            >
+              <label className="text-xs font-medium text-neutral-600">
+                <span className="mb-1.5 block">Staff</span>
+                <select value={offUserId} onChange={(event) => setOffUserId(event.target.value)} className={field} required>
+                  <option value="">Select staff</option>
+                  {floorStaff.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-xs font-medium text-neutral-600">
+                <span className="mb-1.5 block">Date</span>
+                <input type="date" value={offDate} onChange={(event) => setOffDate(event.target.value)} className={field} required />
+              </label>
+              <label className="text-xs font-medium text-neutral-600 sm:col-span-1">
+                <span className="mb-1.5 block">Reason</span>
+                <input value={offReason} onChange={(event) => setOffReason(event.target.value)} className={field} required />
+              </label>
+              <button
+                type="submit"
+                disabled={pending}
+                className="rounded-full bg-black px-4 py-2.5 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-40"
+              >
+                Add
+              </button>
+            </form>
+            <div className="overflow-x-auto rounded-2xl border border-neutral-200 bg-white">
+              <table className="w-full min-w-[640px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-neutral-200 text-xs font-medium tracking-wide text-neutral-400 uppercase">
+                    <th className="px-4 py-3">Staff</th>
+                    <th className="px-4 py-3">Date</th>
+                    <th className="px-4 py-3">Reason</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3 text-right"> </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {requests.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-8 text-center text-sm text-neutral-400">
+                        No off requests yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    requests.map((request) => (
+                      <tr key={request.id} className="border-t border-neutral-100">
+                        <td className="px-4 py-3 font-medium">{request.name}</td>
+                        <td className="px-4 py-3 whitespace-nowrap">{phDateTimeLabel(request.date)}</td>
+                        <td className="px-4 py-3 text-neutral-600">{request.reason}</td>
+                        <td className="px-4 py-3 capitalize">{request.status}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex justify-end gap-2 text-xs font-medium">
+                            {request.status === "pending" ? (
+                              <>
+                                <button
+                                  type="button"
+                                  disabled={pending}
+                                  onClick={() => startTransition(async () => { await setOffRequestStatus(request.id, "approved"); })}
+                                  className="hover:underline"
+                                >
+                                  Approve
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={pending}
+                                  onClick={() => startTransition(async () => { await setOffRequestStatus(request.id, "denied"); })}
+                                  className="hover:underline"
+                                >
+                                  Deny
+                                </button>
+                              </>
+                            ) : null}
+                            <button
+                              type="button"
+                              disabled={pending}
+                              onClick={() => startTransition(async () => { await deleteOffRequest(request.id); })}
+                              className="text-red-600 hover:underline"
+                            >
+                              Delete
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -441,10 +545,9 @@ export function UserManager({ users, session, loginActivity }: UserManagerProps)
                 </tbody>
               </table>
             </div>
-          </div>
-        )}
+          </>
+        ) : null}
       </div>
     </div>
   );
 }
-
