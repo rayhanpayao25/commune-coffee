@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { BrandLogo } from "@/components/BrandLogo";
 import { logout } from "@/actions/auth";
 import type { Session } from "@/lib/types";
@@ -46,6 +47,12 @@ export function StaffHeader({ session, section, onSectionChange }: StaffHeaderPr
             {section === "staff" ? "Staff and accounts" : "Sales and staff"}
           </p>
         </div>
+        <Link
+          href="/"
+          className="rounded-full border border-neutral-300 px-4 py-2 text-sm transition hover:border-black hover:bg-black hover:text-white"
+        >
+          Website
+        </Link>
         <form action={logout}>
           <button
             type="submit"
