@@ -5,7 +5,7 @@ import { logout } from "@/actions/auth";
 import { createOrder, openPos } from "@/actions/pos";
 import { ReceiptPreview } from "@/components/ReceiptPreview";
 import { formatMoney } from "@/lib/menu";
-import { PAYMENT_METHODS, paymentLabel } from "@/lib/payments";
+import { PAYMENT_METHODS, parsePayment, paymentLabel } from "@/lib/payments";
 import { nextTicketNo, type ReceiptTicket } from "@/lib/escpos";
 import { useReceiptPrinter } from "@/lib/receipt-printer";
 import type {
@@ -28,6 +28,54 @@ type PosClientProps = {
 };
 
 const CASH_PRESETS = [500, 1000, 2000];
+const CHECKOUT_KEY = "commune_pos_checkout";
+
+type SavedCheckout = {
+  userId: string;
+  cart: OrderItem[];
+  tendered: string;
+  paymentMethod: PaymentMethod;
+  promoId: string | null;
+};
+
+function readCheckout(userId: string, menu: MenuItem[]): SavedCheckout | null {
+  try {
+    const raw = window.localStorage.getItem(CHECKOUT_KEY);
+    if (!raw) return null;
+    const saved = JSON.parse(raw) as SavedCheckout;
+    if (saved.userId !== userId || !Array.isArray(saved.cart)) return null;
+
+    const catalog = new Map(menu.map((item) => [item.id, item]));
+    const cart = saved.cart.flatMap((item) => {
+      const product = catalog.get(item.productId);
+      if (!product || product.available === false) return [];
+      const qty = Math.floor(Number(item.qty));
+      if (!Number.isFinite(qty) || qty < 1) return [];
+      return [
+        {
+          productId: product.id,
+          name: product.name,
+          qty,
+          price: product.price,
+        },
+      ];
+    });
+
+    return {
+      userId,
+      cart,
+      tendered: typeof saved.tendered === "string" ? saved.tendered : "",
+      paymentMethod: parsePayment(saved.paymentMethod),
+      promoId: typeof saved.promoId === "string" ? saved.promoId : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeCheckout(value: SavedCheckout) {
+  window.localStorage.setItem(CHECKOUT_KEY, JSON.stringify(value));
+}
 
 export function PosClient({
   session,
@@ -53,6 +101,7 @@ export function PosClient({
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const printer = useReceiptPrinter();
+  const [checkoutReady, setCheckoutReady] = useState(false);
   const activePromos = promotions.filter((item) => item.active);
 
   // Helper function to normalize category strings (combines "Non Coffee" and "Non-Coffee")
@@ -83,6 +132,28 @@ export function PosClient({
       return matchesCategory && matchesQuery;
     });
   }, [menu, category, query]);
+
+  useEffect(() => {
+    const saved = readCheckout(session.userId, menu);
+    if (saved) {
+      setCart(saved.cart);
+      setTendered(saved.tendered);
+      setPaymentMethod(saved.paymentMethod);
+      setPromoId(saved.promoId);
+    }
+    setCheckoutReady(true);
+  }, [session.userId, menu]);
+
+  useEffect(() => {
+    if (!checkoutReady) return;
+    writeCheckout({
+      userId: session.userId,
+      cart,
+      tendered,
+      paymentMethod,
+      promoId,
+    });
+  }, [checkoutReady, session.userId, cart, tendered, paymentMethod, promoId]);
 
   useEffect(() => {
     if (promoId && !promotions.some((item) => item.id === promoId && item.active)) {
