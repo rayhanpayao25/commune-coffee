@@ -181,7 +181,12 @@ export function PosClient({
     <div className="relative flex h-svh flex-col overflow-hidden bg-neutral-100 text-black">
       <div className="pos-screen flex min-h-0 flex-1 flex-col overflow-hidden">
         <header className="flex h-12 shrink-0 items-center justify-between bg-black px-4 text-white">
-          <p className="text-base font-bold tracking-tight lowercase">commune.</p>
+          <div className="flex min-w-0 items-center gap-3">
+            <p className="text-base font-bold tracking-tight lowercase">commune.</p>
+            <p className="truncate text-sm font-medium text-white/80">
+              {session.name}
+            </p>
+          </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
