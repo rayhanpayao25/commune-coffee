@@ -1,7 +1,7 @@
 export const CAFE = {
   name: "commune.",
   tagline: "WE COMMUNE, OVER COFFEE",
-  hours: "10:30AM - 12:30PM",
+  hours: "10:30AM - 11:30PM",
   hoursNote: "DAILY",
   street: "Crispin Atilano St., Tetuan",
   landmark: "near RF Mariano & San Lorenzo entrance",
