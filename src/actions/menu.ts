@@ -13,10 +13,10 @@ const PHOTO_TYPES: Record<string, string> = {
 };
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 
-async function requireBarista() {
+async function requireAdmin() {
   const session = await getSession();
-  if (!session || session.role !== "cashier") {
-    throw new Error("Only a cashier can edit the menu.");
+  if (!session || session.role !== "admin") {
+    throw new Error("Only an admin can edit the menu.");
   }
   return session;
 }
@@ -68,7 +68,7 @@ function photoFromForm(formData: FormData) {
 }
 
 export async function addMenuCategory(name: string) {
-  await requireBarista();
+  await requireAdmin();
   const category = name.trim();
   if (!category) {
     return { error: "Enter a category name." };
@@ -91,7 +91,7 @@ export async function addMenuCategory(name: string) {
 }
 
 export async function renameMenuCategory(from: string, to: string) {
-  await requireBarista();
+  await requireAdmin();
   const prev = from.trim();
   const next = to.trim();
   if (!prev) return { error: "Category not found." };
@@ -130,7 +130,7 @@ export async function renameMenuCategory(from: string, to: string) {
 }
 
 export async function deleteMenuCategory(name: string) {
-  await requireBarista();
+  await requireAdmin();
   const category = name.trim();
   if (!category) return { error: "Category not found." };
 
@@ -153,10 +153,11 @@ export async function deleteMenuCategory(name: string) {
 }
 
 export async function createMenuItem(formData: FormData) {
-  await requireBarista();
+  await requireAdmin();
   const name = readText(formData, "name");
   const category = readText(formData, "category");
   const price = Number(readText(formData, "price"));
+  const available = readText(formData, "available") !== "false";
   const photo = photoFromForm(formData);
 
   if (!name || !category) {
@@ -167,7 +168,7 @@ export async function createMenuItem(formData: FormData) {
   }
 
   const id = menuItemId(name);
-  let image = "/images/drinks.jpg";
+  let image = "/images/logo.jpg";
   if (photo) {
     const saved = await saveMenuPhoto(photo, id);
     if ("error" in saved && saved.error) return { error: saved.error };
@@ -184,7 +185,7 @@ export async function createMenuItem(formData: FormData) {
       price: Math.round(price),
       category,
       image,
-      available: true,
+      available,
     });
   });
   refresh();
@@ -192,11 +193,12 @@ export async function createMenuItem(formData: FormData) {
 }
 
 export async function updateMenuItem(formData: FormData) {
-  await requireBarista();
+  await requireAdmin();
   const id = readText(formData, "id");
   const name = readText(formData, "name");
   const category = readText(formData, "category");
   const price = Number(readText(formData, "price"));
+  const available = readText(formData, "available") !== "false";
   const photo = photoFromForm(formData);
 
   if (!id) return { error: "Item not found." };
@@ -224,10 +226,11 @@ export async function updateMenuItem(formData: FormData) {
     item.name = name;
     item.price = Math.round(price);
     item.category = category;
+    item.available = available;
     if (uploaded) {
       item.image = uploaded;
     } else if (!isSafeImage(item.image)) {
-      item.image = "/images/drinks.jpg";
+      item.image = "/images/logo.jpg";
     }
     if (!store.categories.some((entry) => entry.toLowerCase() === category.toLowerCase())) {
       store.categories.push(category);
@@ -239,7 +242,7 @@ export async function updateMenuItem(formData: FormData) {
 }
 
 export async function setMenuItemAvailable(id: string, available: boolean) {
-  await requireBarista();
+  await requireAdmin();
   await updateStore((store) => {
     const item = store.menu.find((entry) => entry.id === id);
     if (item) item.available = available;
@@ -249,7 +252,7 @@ export async function setMenuItemAvailable(id: string, available: boolean) {
 }
 
 export async function deleteMenuItem(id: string) {
-  await requireBarista();
+  await requireAdmin();
   await updateStore((store) => {
     store.menu = store.menu.filter((item) => item.id !== id);
   });

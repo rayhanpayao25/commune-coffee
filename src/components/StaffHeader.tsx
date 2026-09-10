@@ -46,7 +46,7 @@ export function StaffHeader({ session, section, onSectionChange }: StaffHeaderPr
           <div className="min-w-0 text-left sm:text-right">
             <p className="truncate text-sm font-medium">{session.name}</p>
             <p className="hidden text-neutral-500 sm:block text-sm">
-              {section === "staff" ? "Staff and accounts" : "Sales and staff"}
+              {section === "staff" ? "Staff and accounts" : "Sales, menu, and inventory"}
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">

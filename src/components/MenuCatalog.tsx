@@ -1,0 +1,552 @@
+"use client";
+
+import { useMemo, useState, useTransition } from "react";
+import {
+  addMenuCategory,
+  createMenuItem,
+  deleteMenuCategory,
+  deleteMenuItem,
+  renameMenuCategory,
+  setMenuItemAvailable,
+  updateMenuItem,
+} from "@/actions/menu";
+import { formatMoney } from "@/lib/menu";
+import type { MenuItem } from "@/lib/types";
+
+type MenuCatalogProps = {
+  menu: MenuItem[];
+  categories: string[];
+};
+
+type SubTab = "categories" | "items";
+
+const field =
+  "w-full rounded-xl border border-neutral-200 bg-neutral-50/50 px-3.5 py-2.5 text-sm text-neutral-900 outline-none transition-all focus:border-neutral-900 focus:bg-white focus:ring-1 focus:ring-neutral-900";
+
+const iconBtn =
+  "flex h-9 w-9 items-center justify-center rounded-xl text-neutral-400 transition-all hover:bg-neutral-100 hover:text-neutral-900 disabled:opacity-30";
+
+function PencilIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor">
+      <path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3Z" strokeWidth="1.7" strokeLinejoin="round" />
+      <path d="M13.5 6.5l3 3" strokeWidth="1.7" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor">
+      <path d="M5 7h14M10 7V5h4v2M8 7l1 12h6l1-12" strokeWidth="1.7" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor">
+      <path d="M5 12.5l4.5 4.5L19 7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor">
+      <path d="M6 6l12 12M18 6L6 18" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function EyeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor">
+      <path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" strokeWidth="1.7" />
+      <circle cx="12" cy="12" r="2.5" strokeWidth="1.7" />
+    </svg>
+  );
+}
+
+function EyeOffIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor">
+      <path d="M3 3l18 18M10.5 10.7a2.5 2.5 0 0 0 3 3M7 7.4C4.6 8.8 3 12 3 12s3.5 6.5 9.5 6.5c1.4 0 2.7-.3 3.8-.8M16.8 16.2C19.2 14.8 21.5 12 21.5 12S18 5.5 12 5.5c-.7 0-1.3.1-1.9.2" strokeWidth="1.7" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function MenuCatalog({ menu, categories }: MenuCatalogProps) {
+  const [tab, setTab] = useState<SubTab>("items");
+  const [notice, setNotice] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const [newCategory, setNewCategory] = useState("");
+  const [editingCategory, setEditingCategory] = useState<string | null>(null);
+  const [categoryName, setCategoryName] = useState("");
+
+  const [filter, setFilter] = useState("All");
+  const [editingId, setEditingId] = useState<string | "new" | null>(null);
+  const [itemName, setItemName] = useState("");
+  const [itemPrice, setItemPrice] = useState("");
+  const [itemCategory, setItemCategory] = useState("");
+  const [itemAvailable, setItemAvailable] = useState(true);
+
+  const counts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const item of menu) {
+      const key = item.category.toLowerCase();
+      map.set(key, (map.get(key) ?? 0) + 1);
+    }
+    return map;
+  }, [menu]);
+
+  const visibleItems = useMemo(() => {
+    const needle = filter.toLowerCase();
+    return menu
+      .filter((item) => filter === "All" || item.category.toLowerCase() === needle)
+      .sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
+  }, [menu, filter]);
+
+  function flash(message: string | null) {
+    setNotice(message);
+  }
+
+  function startCreateItem() {
+    setEditingId("new");
+    setItemName("");
+    setItemPrice("");
+    setItemCategory(filter !== "All" ? filter : categories[0] ?? "");
+    setItemAvailable(true);
+    setNotice(null);
+    setTab("items");
+  }
+
+  function startEditItem(item: MenuItem) {
+    setEditingId(item.id);
+    setItemName(item.name);
+    setItemPrice(String(item.price));
+    setItemCategory(item.category);
+    setItemAvailable(item.available !== false);
+    setNotice(null);
+    setTab("items");
+  }
+
+  function resetItemForm() {
+    setEditingId(null);
+  }
+
+  function itemFormData() {
+    const data = new FormData();
+    if (editingId && editingId !== "new") data.set("id", editingId);
+    data.set("name", itemName);
+    data.set("price", itemPrice);
+    data.set("category", itemCategory);
+    data.set("available", itemAvailable ? "true" : "false");
+    return data;
+  }
+
+  return (
+    <div className="min-h-screen w-full bg-neutral-50/30">
+      <div className="flex w-full gap-4 overflow-x-auto border-b border-neutral-200 bg-white px-4 text-sm sm:gap-8 sm:px-6">
+        {(
+          [
+            { id: "items", label: "Menu items" },
+            { id: "categories", label: "Categories" },
+          ] as const
+        ).map((entry) => (
+          <button
+            key={entry.id}
+            type="button"
+            onClick={() => setTab(entry.id)}
+            className={`relative shrink-0 py-3 font-medium whitespace-nowrap transition-all ${
+              tab === entry.id
+                ? "-mb-px border-b-2 border-neutral-900 text-neutral-900"
+                : "text-neutral-400 hover:text-neutral-600"
+            }`}
+          >
+            {entry.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="w-full space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-neutral-900 sm:text-3xl">
+              {tab === "categories" ? "Categories" : "Menu"}
+            </h1>
+            <p className="mt-1 text-sm text-neutral-500">
+              {tab === "categories"
+                ? "Add, rename, or remove POS and website categories."
+                : "Add, edit, hide, or delete items on the POS and website."}
+            </p>
+          </div>
+          {tab === "items" ? (
+            <button
+              type="button"
+              onClick={startCreateItem}
+              className="rounded-xl bg-black px-4 py-2.5 text-sm font-medium text-white hover:bg-neutral-800"
+            >
+              Add item
+            </button>
+          ) : null}
+        </div>
+
+        {notice ? <p className="text-sm text-neutral-600">{notice}</p> : null}
+
+        {tab === "categories" ? (
+          <div className="space-y-6">
+            <form
+              className="flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-white p-4 sm:flex-row sm:items-end sm:p-6"
+              onSubmit={(event) => {
+                event.preventDefault();
+                startTransition(async () => {
+                  const result = await addMenuCategory(newCategory);
+                  if (result && "error" in result && result.error) {
+                    flash(result.error);
+                    return;
+                  }
+                  setNewCategory("");
+                  flash("Category added.");
+                });
+              }}
+            >
+              <label className="min-w-0 flex-1 text-xs font-medium text-neutral-600">
+                <span className="mb-1.5 block">New category</span>
+                <input
+                  value={newCategory}
+                  onChange={(event) => setNewCategory(event.target.value)}
+                  placeholder="e.g. Coffee"
+                  className={field}
+                />
+              </label>
+              <button
+                type="submit"
+                disabled={pending || !newCategory.trim()}
+                className="rounded-xl bg-black px-4 py-2.5 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-40"
+              >
+                {pending ? "Saving..." : "Add category"}
+              </button>
+            </form>
+
+            <div className="overflow-x-auto rounded-2xl border border-neutral-200 bg-white">
+              <table className="w-full min-w-[520px] text-left text-sm">
+                <thead>
+                  <tr className="bg-black text-xs font-semibold tracking-wide text-white uppercase">
+                    <th className="px-4 py-3">Category</th>
+                    <th className="px-4 py-3 text-right">Items</th>
+                    <th className="sticky right-0 bg-black px-3 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {categories.length === 0 ? (
+                    <tr>
+                      <td colSpan={3} className="px-4 py-8 text-center text-neutral-500">
+                        No categories yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    categories.map((category) => {
+                      const count = counts.get(category.toLowerCase()) ?? 0;
+                      const editing = editingCategory === category;
+                      return (
+                        <tr key={category} className="border-t border-neutral-100">
+                          <td className="px-4 py-3">
+                            {editing ? (
+                              <input
+                                value={categoryName}
+                                onChange={(event) => setCategoryName(event.target.value)}
+                                className={field}
+                              />
+                            ) : (
+                              <span className="font-medium">{category}</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right text-neutral-500">{count}</td>
+                          <td className="sticky right-0 bg-white px-3 py-3">
+                            <div className="flex justify-end gap-0.5">
+                              {editing ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    aria-label={`Save ${category}`}
+                                    disabled={pending}
+                                    onClick={() =>
+                                      startTransition(async () => {
+                                        const result = await renameMenuCategory(category, categoryName);
+                                        if (result && "error" in result && result.error) {
+                                          flash(result.error);
+                                          return;
+                                        }
+                                        setEditingCategory(null);
+                                        flash("Category renamed.");
+                                      })
+                                    }
+                                    className={iconBtn}
+                                  >
+                                    <CheckIcon />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    aria-label="Cancel rename"
+                                    onClick={() => setEditingCategory(null)}
+                                    className={iconBtn}
+                                  >
+                                    <CloseIcon />
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <button
+                                    type="button"
+                                    aria-label={`Rename ${category}`}
+                                    onClick={() => {
+                                      setEditingCategory(category);
+                                      setCategoryName(category);
+                                      setNotice(null);
+                                    }}
+                                    className={iconBtn}
+                                  >
+                                    <PencilIcon />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    aria-label={`Delete ${category}`}
+                                    disabled={pending}
+                                    onClick={() => {
+                                      if (count > 0) {
+                                        flash("Move or delete items in this category first.");
+                                        return;
+                                      }
+                                      if (!window.confirm(`Delete category “${category}”?`)) return;
+                                      startTransition(async () => {
+                                        const result = await deleteMenuCategory(category);
+                                        if (result && "error" in result && result.error) {
+                                          flash(result.error);
+                                          return;
+                                        }
+                                        flash("Category deleted.");
+                                      });
+                                    }}
+                                    className={`${iconBtn} hover:bg-red-50 hover:text-red-600`}
+                                  >
+                                    <TrashIcon />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {editingId ? (
+              <form
+                className="space-y-4 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm sm:p-6"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  startTransition(async () => {
+                    const result =
+                      editingId === "new"
+                        ? await createMenuItem(itemFormData())
+                        : await updateMenuItem(itemFormData());
+                    if (result && "error" in result && result.error) {
+                      flash(result.error);
+                      return;
+                    }
+                    resetItemForm();
+                    flash(editingId === "new" ? "Item added." : "Item updated.");
+                  });
+                }}
+              >
+                <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
+                  <p className="text-xs font-semibold tracking-wider text-neutral-400 uppercase">
+                    {editingId === "new" ? "New item" : "Edit item"}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={resetItemForm}
+                    className="text-xs text-neutral-500 hover:underline"
+                  >
+                    Cancel
+                  </button>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="text-xs font-medium text-neutral-600">
+                    <span className="mb-1.5 block">Name</span>
+                    <input
+                      value={itemName}
+                      onChange={(event) => setItemName(event.target.value)}
+                      className={field}
+                      required
+                    />
+                  </label>
+                  <label className="text-xs font-medium text-neutral-600">
+                    <span className="mb-1.5 block">Price</span>
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={itemPrice}
+                      onChange={(event) => setItemPrice(event.target.value)}
+                      className={field}
+                      required
+                    />
+                  </label>
+                  <label className="text-xs font-medium text-neutral-600">
+                    <span className="mb-1.5 block">Category</span>
+                    <select
+                      value={itemCategory}
+                      onChange={(event) => setItemCategory(event.target.value)}
+                      className={field}
+                      required
+                    >
+                      <option value="" disabled>
+                        Select a category
+                      </option>
+                      {categories.map((category) => (
+                        <option key={category} value={category}>
+                          {category}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <label className="flex items-center gap-2 text-sm text-neutral-700">
+                  <input
+                    type="checkbox"
+                    checked={itemAvailable}
+                    onChange={(event) => setItemAvailable(event.target.checked)}
+                    className="h-4 w-4 accent-black"
+                  />
+                  Available on POS and website
+                </label>
+                {categories.length === 0 ? (
+                  <p className="text-sm text-neutral-500">Add a category first, then you can add items.</p>
+                ) : null}
+                <button
+                  type="submit"
+                  disabled={pending || !itemName.trim() || !itemCategory || categories.length === 0}
+                  className="rounded-xl bg-black px-4 py-2.5 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-40"
+                >
+                  {pending ? "Saving..." : editingId === "new" ? "Add item" : "Save item"}
+                </button>
+              </form>
+            ) : null}
+
+            <div className="flex flex-wrap gap-1.5">
+              {["All", ...categories].map((name) => (
+                <button
+                  key={name}
+                  type="button"
+                  onClick={() => setFilter(name)}
+                  className={`rounded-lg border px-3 py-1.5 text-xs transition ${
+                    filter === name
+                      ? "border-black bg-black text-white"
+                      : "border-neutral-300 bg-white hover:border-black"
+                  }`}
+                >
+                  {name}
+                </button>
+              ))}
+            </div>
+
+            <div className="overflow-x-auto rounded-2xl border border-neutral-200 bg-white">
+              <table className="w-full min-w-[640px] text-left text-sm">
+                <thead>
+                  <tr className="bg-black text-xs font-semibold tracking-wide text-white uppercase">
+                    <th className="px-4 py-3">Item</th>
+                    <th className="px-4 py-3">Category</th>
+                    <th className="px-4 py-3 text-right">Price</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="sticky right-0 bg-black px-3 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleItems.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-8 text-center text-neutral-500">
+                        No items in this category.
+                      </td>
+                    </tr>
+                  ) : (
+                    visibleItems.map((item) => (
+                      <tr key={item.id} className="border-t border-neutral-100">
+                        <td className="px-4 py-3 font-medium">{item.name}</td>
+                        <td className="px-4 py-3 text-neutral-500">{item.category}</td>
+                        <td className="px-4 py-3 text-right">{formatMoney(item.price)}</td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                              item.available !== false
+                                ? "bg-black text-white"
+                                : "bg-neutral-100 text-neutral-500"
+                            }`}
+                          >
+                            {item.available !== false ? "Available" : "Hidden"}
+                          </span>
+                        </td>
+                        <td className="sticky right-0 bg-white px-3 py-3">
+                          <div className="flex justify-end gap-0.5">
+                            <button
+                              type="button"
+                              aria-label={item.available === false ? `Show ${item.name}` : `Hide ${item.name}`}
+                              disabled={pending}
+                              onClick={() =>
+                                startTransition(async () => {
+                                  await setMenuItemAvailable(item.id, item.available === false);
+                                })
+                              }
+                              className={iconBtn}
+                            >
+                              {item.available === false ? <EyeIcon /> : <EyeOffIcon />}
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={`Edit ${item.name}`}
+                              onClick={() => startEditItem(item)}
+                              className={iconBtn}
+                            >
+                              <PencilIcon />
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={`Delete ${item.name}`}
+                              disabled={pending}
+                              onClick={() => {
+                                if (!window.confirm(`Delete “${item.name}”?`)) return;
+                                startTransition(async () => {
+                                  const result = await deleteMenuItem(item.id);
+                                  if (result && "error" in result && result.error) {
+                                    flash(result.error);
+                                    return;
+                                  }
+                                  if (editingId === item.id) resetItemForm();
+                                  flash("Item deleted.");
+                                });
+                              }}
+                              className={`${iconBtn} hover:bg-red-50 hover:text-red-600`}
+                            >
+                              <TrashIcon />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

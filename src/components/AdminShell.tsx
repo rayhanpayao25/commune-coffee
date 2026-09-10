@@ -5,10 +5,11 @@ import { useRouter } from "next/navigation";
 import { StaffHeader, type AdminSection } from "@/components/StaffHeader";
 import { UserManager } from "@/components/UserManager";
 import { SalePurchaseTransactions } from "@/components/SalePurchaseTransactions";
+import { MenuCatalog } from "@/components/MenuCatalog";
 import type { PublicStaffUser } from "@/lib/users";
 import type { Session, StoreData } from "@/lib/types";
 
-type AdminPanel = "sales" | "transactions";
+type AdminPanel = "sales" | "menu" | "transactions";
 
 type AdminShellProps = {
   session: Session;
@@ -42,8 +43,8 @@ export function AdminShell({ session, users, store, children }: AdminShellProps)
     if (savedSection === "admin") {
       setSection("admin");
     }
-    if (savedPanel === "transactions") {
-      setPanel("transactions");
+    if (savedPanel === "transactions" || savedPanel === "menu") {
+      setPanel(savedPanel);
     }
   }, []);
 
@@ -82,6 +83,7 @@ export function AdminShell({ session, users, store, children }: AdminShellProps)
               {(
                 [
                   ["sales", "Sales"],
+                  ["menu", "Menu"],
                   ["transactions", "Inventory"],
                 ] as const
               ).map(([id, label]) => (
@@ -101,6 +103,9 @@ export function AdminShell({ session, users, store, children }: AdminShellProps)
             </div>
           </div>
           {!isMounted || panel === "sales" ? children : null}
+          {isMounted && panel === "menu" ? (
+            <MenuCatalog menu={store.menu} categories={store.categories} />
+          ) : null}
           {isMounted && panel === "transactions" ? (
             <SalePurchaseTransactions store={store} />
           ) : null}

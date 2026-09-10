@@ -190,10 +190,12 @@ function normalizeStore(store: StoreData): StoreData {
     }));
   }
   store.categories = uniqueCategories([
-    ...(store.categories ?? []),
-    ...MENU_CATEGORIES,
+    ...(Array.isArray(store.categories) ? store.categories : []),
     ...store.menu.map((item) => item.category),
   ]);
+  if (store.categories.length === 0) {
+    store.categories = [...MENU_CATEGORIES];
+  }
   if (!Array.isArray(store.promotions) || store.promotions.length === 0) {
     store.promotions = DEFAULT_PROMOS.map((item) => ({ ...item }));
   } else {
