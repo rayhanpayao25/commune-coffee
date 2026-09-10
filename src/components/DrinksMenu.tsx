@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { formatMoney, MENU_CATEGORIES } from "@/lib/menu";
+import { useEffect, useMemo, useState } from "react";
+import { formatMoney } from "@/lib/menu";
 import type { MenuItem } from "@/lib/types";
 
 type DrinksMenuProps = {
   items: MenuItem[];
+  categories?: string[];
 };
 
 function normalizeCat(name: string) {
@@ -13,22 +14,47 @@ function normalizeCat(name: string) {
   return trimmed.replace(/^non[\s-]*coffee$/i, "Non-Coffee");
 }
 
-function categoryOrder(name: string) {
-  const index = MENU_CATEGORIES.findIndex(
-    (entry) => entry.toLowerCase() === name.toLowerCase(),
-  );
-  return index === -1 ? MENU_CATEGORIES.length : index;
+function orderedCategories(items: MenuItem[], preferred: string[]) {
+  const present = new Map<string, string>();
+  for (const item of items) {
+    const category = normalizeCat(item.category);
+    const key = category.toLowerCase();
+    if (!present.has(key)) present.set(key, category);
+  }
+
+  const ordered: string[] = [];
+  const seen = new Set<string>();
+
+  for (const name of preferred) {
+    const key = normalizeCat(name).toLowerCase();
+    const category = present.get(key);
+    if (!category || seen.has(key)) continue;
+    seen.add(key);
+    ordered.push(category);
+  }
+
+  for (const [key, category] of present) {
+    if (seen.has(key)) continue;
+    seen.add(key);
+    ordered.push(category);
+  }
+
+  return ordered;
 }
 
-export function DrinksMenu({ items }: DrinksMenuProps) {
+export function DrinksMenu({ items, categories = [] }: DrinksMenuProps) {
   const [section, setSection] = useState("All");
 
-  const categories = useMemo(() => {
-    const present = new Set(items.map((item) => normalizeCat(item.category)));
-    return Array.from(present).sort(
-      (a, b) => categoryOrder(a) - categoryOrder(b) || a.localeCompare(b),
-    );
-  }, [items]);
+  const categoryNames = useMemo(
+    () => orderedCategories(items, categories),
+    [items, categories],
+  );
+
+  useEffect(() => {
+    if (section !== "All" && !categoryNames.some((name) => name === section)) {
+      setSection("All");
+    }
+  }, [section, categoryNames]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, MenuItem[]>();
@@ -41,13 +67,13 @@ export function DrinksMenu({ items }: DrinksMenuProps) {
     return map;
   }, [items]);
 
-  const visible = section === "All" ? categories : categories.filter((name) => name === section);
+  const visible = section === "All" ? categoryNames : categoryNames.filter((name) => name === section);
 
   return (
     <>
       <div className="sticky top-0 z-10 mb-12 border-b border-white/10 bg-black/90 py-4 backdrop-blur-md">
         <div className="flex flex-wrap gap-2">
-          {["All", ...categories].map((name) => {
+          {["All", ...categoryNames].map((name) => {
             const active = section === name;
             return (
               <button

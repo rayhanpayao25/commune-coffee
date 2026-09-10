@@ -24,6 +24,7 @@ async function requireAdmin() {
 function refresh() {
   revalidatePath("/pos");
   revalidatePath("/admin");
+  revalidatePath("/drinks");
   revalidatePath("/");
 }
 
