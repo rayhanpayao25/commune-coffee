@@ -388,7 +388,7 @@ export function UserManager({ users, session, loginActivity }: UserManagerProps)
                           <span
                             className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${
                               isLogin
-                                ? "bg-emerald-50 text-emerald-700"
+                                ? "bg-black text-white"
                                 : "bg-neutral-100 text-neutral-600"
                             }`}
                           >

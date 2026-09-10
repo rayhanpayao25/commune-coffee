@@ -119,6 +119,7 @@ function seedOrders(): Order[] {
 const DEFAULT_INVENTORY: InventoryItem[] = [
   { id: "coffee-beans", name: "Coffee Beans", category: "Ingredients", unit: "grams", cost: 650, stock: 1000, maxStock: 5000 },
   { id: "milk", name: "Milk", category: "Dairy", unit: "ml", cost: 95, stock: 5000, maxStock: 10000 },
+  { id: "sugar", name: "Sugar", category: "Ingredients", unit: "grams", cost: 80, stock: 1000, maxStock: 5000 },
   { id: "cups", name: "Cups", category: "Packaging", unit: "pcs", cost: 3, stock: 200, maxStock: 1000 },
   { id: "matcha-powder", name: "Matcha Powder", category: "Ingredients", unit: "grams", cost: 450, stock: 500, maxStock: 1000 },
 ];
@@ -126,6 +127,7 @@ const DEFAULT_INVENTORY: InventoryItem[] = [
 const DEFAULT_COSTINGS: CostingItem[] = [
   { id: "cost-coffee-beans", productName: "Coffee Beans", ingredients: [{ name: "Coffee Beans", amount: 1000, unit: "grams", outputCups: 55 }] },
   { id: "cost-milk", productName: "Milk", ingredients: [{ name: "Milk", amount: 1000, unit: "ml", outputCups: 7.5 }] },
+  { id: "cost-sugar", productName: "Sugar", ingredients: [{ name: "Sugar", amount: 1000, unit: "grams", outputCups: 100 }] },
   { id: "cost-matcha", productName: "Matcha Powder", ingredients: [{ name: "Matcha Powder", amount: 150, unit: "grams", outputCups: 15 }] },
 ];
 
@@ -133,6 +135,7 @@ const DEFAULT_RECIPES: Record<string, RecipeIngredient[]> = Object.fromEntries(
   DEFAULT_MENU.map((item) => [item.id, [
     { inventoryItemId: "coffee-beans", name: "Coffee Beans", amount: 18, unit: "grams" },
     { inventoryItemId: "milk", name: "Milk", amount: 133, unit: "ml" },
+    { inventoryItemId: "sugar", name: "Sugar", amount: 10, unit: "grams" },
     { inventoryItemId: "cups", name: "Cups", amount: 1, unit: "pcs" },
   ]]),
 );
@@ -240,6 +243,25 @@ function normalizeStore(store: StoreData): StoreData {
     });
   }
 
+  if (!store.inventory.some((item) => item.id === "sugar" || /^sugar$/i.test(item.name))) {
+    store.inventory.push({
+      id: "sugar",
+      name: "Sugar",
+      category: "Ingredients",
+      unit: "grams",
+      cost: 80,
+      stock: 1000,
+      maxStock: 5000,
+    });
+  }
+  if (!store.costings.some((costing) => costing.id === "cost-sugar" || /^sugar$/i.test(costing.productName))) {
+    store.costings.push({
+      id: "cost-sugar",
+      productName: "Sugar",
+      ingredients: [{ name: "Sugar", amount: 1000, unit: "grams", outputCups: 100 }],
+    });
+  }
+
   if (!Array.isArray(store.users) || store.users.length === 0) {
     store.users = DEFAULT_USERS.map((item) => ({ ...item }));
   } else {
@@ -304,7 +326,11 @@ async function readStore(): Promise<StoreData> {
   const original = data.payload as StoreData;
   const store = normalizeStore(original);
   const originalCostings = Array.isArray(original.costings) ? original.costings : [];
-  if (store.costings.length !== originalCostings.length) {
+  const originalInventory = Array.isArray(original.inventory) ? original.inventory : [];
+  if (
+    store.costings.length !== originalCostings.length ||
+    store.inventory.length !== originalInventory.length
+  ) {
     await writeStore(store);
   }
   return store;

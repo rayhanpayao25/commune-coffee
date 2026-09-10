@@ -240,7 +240,7 @@ export function StockManager({ title = "Inventory Management" }: { title?: strin
                         />
                       </td>
                       <td className="p-3 text-right space-x-2">
-                        <button onClick={() => handleUpdate(item.id)} className="text-green-600 font-medium text-xs hover:underline">Save</button>
+                        <button onClick={() => handleUpdate(item.id)} className="text-black font-medium text-xs hover:underline">Save</button>
                         <button onClick={() => setEditingId(null)} className="text-neutral-500 font-medium text-xs hover:underline">Cancel</button>
                       </td>
                     </>
@@ -262,11 +262,11 @@ export function StockManager({ title = "Inventory Management" }: { title?: strin
                             className="w-20 rounded border border-neutral-300 px-2 py-1 text-center text-xs"
                             aria-label={`Restock ${item.name}`}
                           />
-                          <button onClick={() => handleRestock(item.id)} className="rounded bg-teal-700 px-3 py-1 text-xs font-medium text-white hover:bg-teal-800">Add</button>
+                          <button onClick={() => handleRestock(item.id)} className="rounded bg-black px-3 py-1 text-xs font-medium text-white hover:bg-neutral-800">Add</button>
                         </div>
                       </td>
                       <td className="p-4 text-right space-x-3">
-                        <button onClick={() => startEdit(item)} className="text-blue-600 hover:underline text-xs font-medium">Edit</button>
+                        <button onClick={() => startEdit(item)} className="text-black hover:underline text-xs font-medium">Edit</button>
                         <button onClick={() => handleDelete(item.id)} className="text-red-600 hover:underline text-xs font-medium">Delete</button>
                       </td>
                     </>

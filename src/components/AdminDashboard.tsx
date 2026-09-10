@@ -880,7 +880,7 @@ export function AdminDashboard({ store }: { store: StoreData }) {
                       className={`mt-1 inline-block rounded px-2 py-0.5 text-[10px] font-medium ${
                         order.voided
                           ? "bg-red-100 text-red-700"
-                          : "bg-green-100 text-green-700"
+                          : "bg-black text-white"
                       }`}
                     >
                       {order.voided ? "Voided" : "Completed"}
@@ -942,7 +942,7 @@ export function AdminDashboard({ store }: { store: StoreData }) {
                         className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${
                           order.voided
                         ? "bg-red-100 text-red-700"
-                        : "bg-green-100 text-green-700"
+                        : "bg-black text-white"
                         }`}
                       >
                         {order.voided ? "Voided" : "Completed"}

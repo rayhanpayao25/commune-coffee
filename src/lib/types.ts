@@ -39,6 +39,7 @@ export type Order = {
   paid?: number;
   change?: number;
   voided?: boolean;
+  recordType?: "Sale" | "Purchase";
 };
 
 export type PosState = {
@@ -89,6 +90,7 @@ export type UsageLog = {
   itemName: string;
   usedAmount: number;
   unit: string;
+  remaining?: number;
 };
 
 export type RestockRecord = {

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth";
 import { nextTicketNo } from "@/lib/escpos";
 import { parsePayment } from "@/lib/payments";
+import { ingredientsForOrderLine, roundQty } from "@/lib/inventory";
 import { updateStore } from "@/lib/store";
 import type { OrderItem, StoreData } from "@/lib/types";
 
@@ -22,34 +23,12 @@ async function requireAdmin() {
   }
 }
 
-function ingredientsForOrderLine(store: StoreData, line: OrderItem) {
-  const menuItem = store.menu.find((item) => item.id === line.productId);
-  const isMatcha = menuItem?.category === "Matcha Drinks" || /matcha|hojicha/i.test(line.name);
-  const configured = store.recipes[line.productId] ?? [];
-
-  if (!isMatcha) return configured;
-
-  const matchaInventory = store.inventory.find(
-    (item) => item.id === "matcha-powder" || /matcha powder/i.test(item.name),
-  );
-  if (!matchaInventory) return configured;
-
-  return [
-    ...configured.filter((ingredient) => ingredient.inventoryItemId !== matchaInventory.id),
-    {
-      inventoryItemId: matchaInventory.id,
-      name: matchaInventory.name,
-      amount: 10,
-      unit: "grams",
-    },
-  ];
-}
-
 export async function saveAdminData(data: {
   inventory?: StoreData["inventory"];
   restocks?: StoreData["restocks"];
   costings?: StoreData["costings"];
   usageLogs?: StoreData["usageLogs"];
+  orders?: StoreData["orders"];
 }) {
   await requireAdmin();
   await updateStore((store) => {
@@ -57,6 +36,7 @@ export async function saveAdminData(data: {
     if (data.restocks) store.restocks = data.restocks;
     if (data.costings) store.costings = data.costings;
     if (data.usageLogs) store.usageLogs = data.usageLogs;
+    if (data.orders) store.orders = data.orders;
   });
   revalidatePath("/admin");
   return { ok: true };
@@ -201,29 +181,39 @@ export async function createOrder(
     ticketNo = nextTicketNo(store.orders);
     const orderId = `ord-${Date.now()}`;
     const createdAt = new Date().toISOString();
-    const usageEntries = [] as typeof store.usageLogs;
+    const usageByItem = new Map<string, StoreData["usageLogs"][number]>();
 
     for (const line of priced) {
       const ingredients = ingredientsForOrderLine(store, line);
       for (const ingredient of ingredients) {
-        const amount = ingredient.amount * line.qty;
+        const amount = roundQty(ingredient.amount * line.qty);
         const inventory = store.inventory.find((item) =>
           item.id === ingredient.inventoryItemId || item.name.toLowerCase() === ingredient.name.toLowerCase(),
         );
         if (!inventory) continue;
-        inventory.stock = Math.max(0, inventory.stock - amount);
-        usageEntries.push({
-          id: `${orderId}-${inventory.id}`,
-          orderId,
-          orderItemId: line.productId,
-          date: createdAt,
-          itemName: inventory.name,
-          usedAmount: amount,
-          unit: ingredient.unit,
-        });
+        inventory.stock = roundQty(Math.max(0, inventory.stock - amount));
+        const existing = usageByItem.get(inventory.id);
+        if (existing) {
+          existing.usedAmount = roundQty(existing.usedAmount + amount);
+          existing.remaining = inventory.stock;
+        } else {
+          usageByItem.set(inventory.id, {
+            id: `${orderId}-${inventory.id}-${usageByItem.size}`,
+            orderId,
+            orderItemId: line.productId,
+            date: createdAt,
+            itemName: inventory.name,
+            usedAmount: amount,
+            unit: ingredient.unit,
+            remaining: inventory.stock,
+          });
+        }
       }
     }
-    store.usageLogs = [...store.usageLogs.filter((entry) => entry.orderId !== orderId), ...usageEntries];
+    store.usageLogs = [
+      ...store.usageLogs.filter((entry) => entry.orderId !== orderId),
+      ...usageByItem.values(),
+    ];
 
     store.orders.push({
       id: orderId,

@@ -82,7 +82,7 @@ export function AdminShell({ session, users, store, children }: AdminShellProps)
               {(
                 [
                   ["sales", "Sales"],
-                  ["transactions", "Transactions"],
+                  ["transactions", "Inventory"],
                 ] as const
               ).map(([id, label]) => (
                 <button
