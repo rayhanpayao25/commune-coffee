@@ -7,13 +7,11 @@ const ROLES = [
   {
     id: "admin",
     label: "Admin",
-    username: "admin",
     note: "Sales and staff",
   },
   {
     id: "barista",
     label: "Barista",
-    username: "barista",
     note: "POS only",
   },
 ] as const;
@@ -53,10 +51,10 @@ export function LoginForm() {
           Username
         </span>
         <input
-          key={selected.username}
+          key={role}
           name="username"
-          defaultValue={selected.username}
           autoComplete="username"
+          autoFocus
           className={field}
         />
       </label>
@@ -68,7 +66,6 @@ export function LoginForm() {
         <input
           name="password"
           type="password"
-          defaultValue="commune"
           autoComplete="current-password"
           className={field}
         />
