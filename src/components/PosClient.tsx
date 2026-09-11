@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { logout } from "@/actions/auth";
 import { createOrder, openPos, verifyManager, voidOrder } from "@/actions/pos";
-import { createOffRequest } from "@/actions/users";
 import { ReceiptPreview } from "@/components/ReceiptPreview";
 import { formatMoney } from "@/lib/menu";
 import { phDateString, phDateTimeLabel } from "@/lib/datetime";
@@ -79,114 +78,6 @@ function writeCheckout(value: SavedCheckout) {
   window.localStorage.setItem(CHECKOUT_KEY, JSON.stringify(value));
 }
 
-const SWIPE_DELETE = 88;
-
-function CheckoutRow({
-  item,
-  open,
-  onOpen,
-  onClose,
-  onDelete,
-}: {
-  item: OrderItem;
-  open: boolean;
-  onOpen: () => void;
-  onClose: () => void;
-  onDelete: () => void;
-}) {
-  const startX = useRef(0);
-  const startY = useRef(0);
-  const origin = useRef(0);
-  const axis = useRef<"x" | "y" | null>(null);
-  const dragging = useRef(false);
-  const offsetRef = useRef(0);
-  const [offset, setOffset] = useState(0);
-  const [draggingNow, setDraggingNow] = useState(false);
-
-  function slideTo(next: number) {
-    offsetRef.current = next;
-    setOffset(next);
-  }
-
-  useEffect(() => {
-    if (!dragging.current) {
-      slideTo(open ? -SWIPE_DELETE : 0);
-    }
-  }, [open]);
-
-  function pointerDown(e: React.PointerEvent<HTMLDivElement>) {
-    startX.current = e.clientX;
-    startY.current = e.clientY;
-    origin.current = offsetRef.current;
-    axis.current = null;
-    dragging.current = true;
-  }
-
-  function pointerMove(e: React.PointerEvent<HTMLDivElement>) {
-    if (!dragging.current) return;
-    const dx = e.clientX - startX.current;
-    const dy = e.clientY - startY.current;
-    if (!axis.current) {
-      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-      axis.current = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
-      if (axis.current === "x") {
-        setDraggingNow(true);
-        e.currentTarget.setPointerCapture(e.pointerId);
-      }
-    }
-    if (axis.current !== "x") return;
-    slideTo(Math.min(0, Math.max(-SWIPE_DELETE, origin.current + dx)));
-  }
-
-  function pointerUp() {
-    if (!dragging.current) return;
-    dragging.current = false;
-    setDraggingNow(false);
-    if (axis.current !== "x") {
-      axis.current = null;
-      return;
-    }
-    axis.current = null;
-    if (offsetRef.current <= -SWIPE_DELETE / 2) {
-      slideTo(-SWIPE_DELETE);
-      onOpen();
-    } else {
-      slideTo(0);
-      onClose();
-    }
-  }
-
-  return (
-    <li className="relative overflow-hidden border-b border-neutral-100 last:border-none">
-      <button
-        type="button"
-        onClick={onDelete}
-        className="absolute inset-y-0 right-0 flex w-[88px] items-center justify-center bg-red-600 text-[11px] font-semibold tracking-wide text-white uppercase"
-      >
-        Delete
-      </button>
-      <div
-        className="relative grid select-none grid-cols-[1fr_auto_auto] items-center gap-x-3 bg-white py-1.5"
-        style={{
-          transform: `translateX(${offset}px)`,
-          transition: draggingNow ? "none" : "transform 160ms ease",
-          touchAction: "pan-y",
-        }}
-        onPointerDown={pointerDown}
-        onPointerMove={pointerMove}
-        onPointerUp={pointerUp}
-        onPointerCancel={pointerUp}
-      >
-        <span className="min-w-0 truncate text-xs">{item.name}</span>
-        <span className="w-16 text-center text-xs">{item.qty}</span>
-        <span className="w-16 text-right text-xs">
-          {formatMoney(item.price * item.qty)}
-        </span>
-      </div>
-    </li>
-  );
-}
-
 export function PosClient({
   session,
   pos,
@@ -215,10 +106,6 @@ export function PosClient({
   const [pending, startTransition] = useTransition();
   const printer = useReceiptPrinter();
   const [checkoutReady, setCheckoutReady] = useState(false);
-  const [swipeOpenId, setSwipeOpenId] = useState<string | null>(null);
-  const [offOpen, setOffOpen] = useState(false);
-  const [offDate, setOffDate] = useState(phDateString());
-  const [offReason, setOffReason] = useState("");
   const activePromos = promotions.filter((item) => item.active);
 
   // Helper function to normalize category strings (combines "Non Coffee" and "Non-Coffee")
@@ -329,12 +216,6 @@ export function PosClient({
     setMessage(null);
   }
 
-  function removeItem(id: string) {
-    setCart((current) => current.filter((item) => item.productId !== id));
-    setSwipeOpenId(null);
-    setMessage(null);
-  }
-
   function handleConfirmVoid(e: React.FormEvent) {
     e.preventDefault();
     if (!voidReason.trim()) {
@@ -438,17 +319,6 @@ export function PosClient({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => {
-                setOffDate(phDateString());
-                setOffReason("");
-                setOffOpen(true);
-              }}
-              className="rounded-lg bg-neutral-900 px-3 py-1.5 text-xs font-medium text-neutral-300 transition hover:bg-neutral-800 hover:text-white"
-            >
-              Request off
-            </button>
-            <button
-              type="button"
               disabled={pending || !printer.supported}
               onClick={() =>
                 startTransition(async () => {
@@ -487,64 +357,6 @@ export function PosClient({
             </button>
           </div>
         </header>
-
-        {offOpen ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
-            <form
-              className="w-full max-w-sm space-y-4 rounded-3xl bg-white p-6"
-              onSubmit={(event) => {
-                event.preventDefault();
-                startTransition(async () => {
-                  const result = await createOffRequest({ date: offDate, reason: offReason });
-                  if (result && "error" in result && result.error) {
-                    setMessage(typeof result.error === "string" ? result.error : "Could not send request.");
-                    return;
-                  }
-                  setOffOpen(false);
-                  setOffReason("");
-                  setMessage("Off request sent.");
-                });
-              }}
-            >
-              <h2 className="text-lg font-semibold">Request off</h2>
-              <label className="block text-xs font-medium text-neutral-600">
-                <span className="mb-1.5 block">Date</span>
-                <input
-                  type="date"
-                  value={offDate}
-                  onChange={(event) => setOffDate(event.target.value)}
-                  className="w-full rounded-xl border border-neutral-200 px-3 py-2.5 text-sm outline-none focus:border-black"
-                  required
-                />
-              </label>
-              <label className="block text-xs font-medium text-neutral-600">
-                <span className="mb-1.5 block">Reason</span>
-                <input
-                  value={offReason}
-                  onChange={(event) => setOffReason(event.target.value)}
-                  className="w-full rounded-xl border border-neutral-200 px-3 py-2.5 text-sm outline-none focus:border-black"
-                  required
-                />
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setOffOpen(false)}
-                  className="rounded-xl border border-neutral-300 py-2.5 text-sm"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={pending}
-                  className="rounded-xl bg-black py-2.5 text-sm font-medium text-white disabled:opacity-40"
-                >
-                  Send
-                </button>
-              </div>
-            </form>
-          </div>
-        ) : null}
 
         {/* Void Modal */}
         {voidModalOpen ? (
@@ -935,23 +747,23 @@ export function PosClient({
             </div>
             
             {/* Scrollable Order List */}
-            <ul className="min-h-[100px] flex-1 overflow-y-auto overscroll-x-contain px-3 py-1">
+            <ul className="min-h-[100px] flex-1 overflow-y-auto px-3 py-1">
               {cart.length === 0 ? (
                 <li className="py-6 text-center text-xs text-neutral-400">
                   No items yet.
                 </li>
               ) : (
                 cart.map((item) => (
-                  <CheckoutRow
+                  <li
                     key={item.productId}
-                    item={item}
-                    open={swipeOpenId === item.productId}
-                    onOpen={() => setSwipeOpenId(item.productId)}
-                    onClose={() =>
-                      setSwipeOpenId((id) => (id === item.productId ? null : id))
-                    }
-                    onDelete={() => removeItem(item.productId)}
-                  />
+                    className="grid grid-cols-[1fr_auto_auto] items-center gap-x-3 border-b border-neutral-100 py-1.5 last:border-none"
+                  >
+                    <span className="min-w-0 truncate text-xs">{item.name}</span>
+                    <span className="w-16 text-center text-xs">{item.qty}</span>
+                    <span className="w-16 text-right text-xs">
+                      {formatMoney(item.price * item.qty)}
+                    </span>
+                  </li>
                 ))
               )}
             </ul>
