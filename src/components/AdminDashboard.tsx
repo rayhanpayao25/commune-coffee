@@ -343,6 +343,10 @@ export function AdminDashboard({ store }: { store: StoreData }) {
   const periodCredits = credits.filter((entry) => entryInPeriod(entry.date, startOfPeriod, now));
   const totalExpensesAmount = periodExpenses.reduce((sum, e) => sum + e.amount, 0);
   const totalCreditsAmount = periodCredits.reduce((sum, c) => sum + c.amount, 0);
+  const todayStr = toInputDateStr(new Date());
+  const canEditLedgers =
+    (activeFilterMode === "range" && rangeType === "today") ||
+    (activeFilterMode === "date" && filterDateStr === todayStr);
 
   const netProfitOrLoss = totalSalesAmount - (totalExpensesAmount + totalCreditsAmount);
 
@@ -362,7 +366,7 @@ export function AdminDashboard({ store }: { store: StoreData }) {
 
   const handleAddExpense = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newExpTitle || !newExpAmount) return;
+    if (!canEditLedgers || !newExpTitle || !newExpAmount) return;
     const item: CustomEntry = {
       id: String(Date.now()),
       title: newExpTitle,
@@ -377,12 +381,15 @@ export function AdminDashboard({ store }: { store: StoreData }) {
   };
 
   const handleDeleteExpense = (id: string) => {
+    if (!canEditLedgers) return;
+    const entry = expenses.find((ex) => ex.id === id);
+    if (!entry || entry.date !== todayStr) return;
     setExpenses(expenses.filter((ex) => ex.id !== id));
   };
 
   const handleAddCredit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newCredTitle || !newCredAmount) return;
+    if (!canEditLedgers || !newCredTitle || !newCredAmount) return;
     const item: CustomEntry = {
       id: String(Date.now()),
       title: newCredTitle,
@@ -397,6 +404,9 @@ export function AdminDashboard({ store }: { store: StoreData }) {
   };
 
   const handleDeleteCredit = (id: string) => {
+    if (!canEditLedgers) return;
+    const entry = credits.find((cr) => cr.id === id);
+    if (!entry || entry.date !== todayStr) return;
     setCredits(credits.filter((cr) => cr.id !== id));
   };
 
@@ -715,6 +725,7 @@ export function AdminDashboard({ store }: { store: StoreData }) {
             </div>
           </div>
 
+          {canEditLedgers ? (
           <form onSubmit={handleAddExpense} className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-neutral-100">
             <input
               type="text"
@@ -744,6 +755,11 @@ export function AdminDashboard({ store }: { store: StoreData }) {
               Add Expense
             </button>
           </form>
+          ) : (
+            <p className="pt-2 border-t border-neutral-100 text-xs text-neutral-400">
+              View-only. Switch Range to Today to add or delete.
+            </p>
+          )}
 
           <div className="overflow-x-auto max-h-48 overflow-y-auto">
             <table className="w-full text-left text-sm">
@@ -756,21 +772,26 @@ export function AdminDashboard({ store }: { store: StoreData }) {
                 </tr>
               </thead>
               <tbody>
-                {expenses.length === 0 ? (
-                  <tr><td colSpan={4} className="py-4 text-center text-neutral-400 text-xs">No expenses added yet.</td></tr>
+                {periodExpenses.length === 0 ? (
+                  <tr><td colSpan={4} className="py-4 text-center text-neutral-400 text-xs">No expenses in this range.</td></tr>
                 ) : (
-                  expenses.map((ex, exIdx) => (
+                  periodExpenses.map((ex, exIdx) => (
                     <tr key={`${ex.id}-${exIdx}`} className="border-b border-neutral-50 text-xs">
                       <td className="py-2">{ex.title}</td>
                       <td className="py-2 text-neutral-500">{ex.reason || "—"}</td>
                       <td className="py-2 text-right font-medium">{formatMoney(ex.amount)}</td>
                       <td className="py-2 text-right">
-                        <button
-                          onClick={() => handleDeleteExpense(ex.id)}
-                          className="text-red-500 hover:text-red-700 font-medium px-2 py-1"
-                        >
-                          Delete
-                        </button>
+                        {canEditLedgers && ex.date === todayStr ? (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteExpense(ex.id)}
+                            className="text-red-500 hover:text-red-700 font-medium px-2 py-1"
+                          >
+                            Delete
+                          </button>
+                        ) : (
+                          <span className="text-neutral-300">—</span>
+                        )}
                       </td>
                     </tr>
                   ))
@@ -788,6 +809,7 @@ export function AdminDashboard({ store }: { store: StoreData }) {
             </div>
           </div>
 
+          {canEditLedgers ? (
           <form onSubmit={handleAddCredit} className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-neutral-100">
             <input
               type="text"
@@ -817,6 +839,11 @@ export function AdminDashboard({ store }: { store: StoreData }) {
               Add Credit
             </button>
           </form>
+          ) : (
+            <p className="pt-2 border-t border-neutral-100 text-xs text-neutral-400">
+              View-only. Switch Range to Today to add or delete.
+            </p>
+          )}
 
           <div className="overflow-x-auto max-h-48 overflow-y-auto">
             <table className="w-full text-left text-sm">
@@ -829,21 +856,26 @@ export function AdminDashboard({ store }: { store: StoreData }) {
                 </tr>
               </thead>
               <tbody>
-                {credits.length === 0 ? (
-                  <tr><td colSpan={4} className="py-4 text-center text-neutral-400 text-xs">No credits added yet.</td></tr>
+                {periodCredits.length === 0 ? (
+                  <tr><td colSpan={4} className="py-4 text-center text-neutral-400 text-xs">No credits in this range.</td></tr>
                 ) : (
-                  credits.map((cr, crIdx) => (
+                  periodCredits.map((cr, crIdx) => (
                     <tr key={`${cr.id}-${crIdx}`} className="border-b border-neutral-50 text-xs">
                       <td className="py-2">{cr.title}</td>
                       <td className="py-2 text-neutral-500">{cr.reason || "—"}</td>
                       <td className="py-2 text-right font-medium">{formatMoney(cr.amount)}</td>
                       <td className="py-2 text-right">
-                        <button
-                          onClick={() => handleDeleteCredit(cr.id)}
-                          className="text-red-500 hover:text-red-700 font-medium px-2 py-1"
-                        >
-                          Delete
-                        </button>
+                        {canEditLedgers && cr.date === todayStr ? (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCredit(cr.id)}
+                            className="text-red-500 hover:text-red-700 font-medium px-2 py-1"
+                          >
+                            Delete
+                          </button>
+                        ) : (
+                          <span className="text-neutral-300">—</span>
+                        )}
                       </td>
                     </tr>
                   ))
