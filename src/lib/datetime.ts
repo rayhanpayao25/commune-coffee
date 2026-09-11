@@ -102,3 +102,52 @@ export function phTimestamp(value: string | Date): number {
   const date = new Date(trimmed);
   return Number.isNaN(date.getTime()) ? 0 : date.getTime();
 }
+
+export type PeriodRange =
+  | "today"
+  | "week"
+  | "lastWeek"
+  | "month"
+  | "lastMonth"
+  | "thisYear"
+  | "lastYear";
+
+function ymd(year: number, month: number, day: number) {
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return [
+    date.getUTCFullYear(),
+    String(date.getUTCMonth() + 1).padStart(2, "0"),
+    String(date.getUTCDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+export function phPeriodBounds(range: PeriodRange, now: Date = new Date()): { from: string; to: string } {
+  const today = phDateString(now);
+  const [year, month, day] = today.split("-").map(Number);
+
+  if (range === "today") return { from: today, to: today };
+  if (range === "week") {
+    const start = new Date(Date.UTC(year, month - 1, day - 6));
+    return { from: ymd(start.getUTCFullYear(), start.getUTCMonth() + 1, start.getUTCDate()), to: today };
+  }
+  if (range === "lastWeek") {
+    const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+    const daysFromMonday = weekday === 0 ? 6 : weekday - 1;
+    const lastMonday = day - daysFromMonday - 7;
+    const start = new Date(Date.UTC(year, month - 1, lastMonday));
+    const end = new Date(Date.UTC(year, month - 1, lastMonday + 6));
+    return {
+      from: ymd(start.getUTCFullYear(), start.getUTCMonth() + 1, start.getUTCDate()),
+      to: ymd(end.getUTCFullYear(), end.getUTCMonth() + 1, end.getUTCDate()),
+    };
+  }
+  if (range === "month") return { from: ymd(year, month, 1), to: today };
+  if (range === "lastMonth") {
+    const end = new Date(Date.UTC(year, month - 1, 0));
+    const endYear = end.getUTCFullYear();
+    const endMonth = end.getUTCMonth() + 1;
+    return { from: ymd(endYear, endMonth, 1), to: ymd(endYear, endMonth, end.getUTCDate()) };
+  }
+  if (range === "thisYear") return { from: ymd(year, 1, 1), to: today };
+  return { from: ymd(year - 1, 1, 1), to: ymd(year - 1, 12, 31) };
+}

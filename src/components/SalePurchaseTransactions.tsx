@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { deleteAdminRecord, saveAdminData } from "@/actions/pos";
-import { costingIngredientForItem, cupsFromQuantity, formatQty, namesMatch, perCupAmount, remainingForUsages, roundQty, stockLedgerForDate } from "@/lib/inventory";
-import { phDateString, phDateTimeLabel, phIsoFromDate, phNowDateTime } from "@/lib/datetime";
+import { costingIngredientForItem, cupsFromQuantity, formatQty, namesMatch, perCupAmount, remainingForUsages, roundQty, stockLedgerForRange } from "@/lib/inventory";
+import { phDateString, phDateTimeLabel, phIsoFromDate, phNowDateTime, phPeriodBounds, type PeriodRange } from "@/lib/datetime";
 import type { Order, StoreData } from "@/lib/types";
 
 type TabType = "transactions" | "stock" | "restock" | "costing" | "used";
@@ -186,7 +186,9 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
 
   const [filterType, setFilterType] = useState("All");
   const [filterKeyword, setFilterKeyword] = useState("");
-  const [selectedDateFilter, setSelectedDateFilter] = useState("");
+  const [rangeType, setRangeType] = useState<PeriodRange>("today");
+  const [filterDate, setFilterDate] = useState(getTodayDate);
+  const [filterMode, setFilterMode] = useState<"range" | "date">("range");
 
   const handleTotalUsedChange = (itemName: string, value: string) => {
     const nextTotal = Math.max(0, Number(value) || 0);
@@ -336,10 +338,15 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
 
   const handleSaveTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!txProduct || !txQty || !txPrice || !txDate) return;
+    if (!txProduct || !txQty || !txPrice) return;
     const qty = Number(txQty);
     const prc = Number(txPrice);
     if (!Number.isFinite(qty) || qty <= 0 || !Number.isFinite(prc) || prc < 0) return;
+    const saveDate = editTxId
+      ? (transactions.find((t) => t.id === editTxId)?.date ?? txDate)
+      : filterMode === "date"
+        ? filterDate
+        : getTodayDate();
 
     if (editTxId) {
       const oldTx = transactions.find((t) => t.id === editTxId);
@@ -365,8 +372,8 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
               quantity: qty,
               price: prc,
               amount: qty * prc,
-              date: txDate,
-              createdAt: phIsoFromDate(txDate, t.createdAt),
+              date: saveDate,
+              createdAt: phIsoFromDate(saveDate, t.createdAt),
             }
           : t,
       );
@@ -376,7 +383,7 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
         txProduct,
         txType,
         qty,
-        txDate,
+        saveDate,
         false,
       ));
       await persistInventoryAndUsage(nextStocks, nextUsages);
@@ -391,8 +398,8 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
         quantity: qty,
         price: prc,
         amount: qty * prc,
-        date: txDate,
-        createdAt: phIsoFromDate(txDate),
+        date: saveDate,
+        createdAt: phIsoFromDate(saveDate),
       };
       const nextTransactions = [newTx, ...transactions];
       setTransactions(nextTransactions);
@@ -402,7 +409,7 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
         txProduct,
         txType,
         qty,
-        txDate,
+        saveDate,
         false,
       );
       await persistInventoryAndUsage(nextStocks, nextUsages);
@@ -527,12 +534,17 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
 
   const handleSaveRestock = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!restockItem || !restockQty || !restockDate) return;
+    if (!restockItem || !restockQty) return;
     const qty = Number(restockQty);
+    const saveDate = editRestockId
+      ? (restocks.find((record) => record.id === editRestockId)?.date ?? restockDate)
+      : filterMode === "date"
+        ? filterDate
+        : getTodayDate();
     const stamp =
-      phDateString(restockDate) === getTodayDate()
+      phDateString(saveDate) === getTodayDate()
         ? getNowDateTime()
-        : `${phDateString(restockDate)} 12:00:00`;
+        : `${phDateString(saveDate)} 12:00:00`;
 
     if (editRestockId) {
       const previous = restocks.find((record) => record.id === editRestockId);
@@ -623,18 +635,74 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
     await deleteAdminRecord("costing", id);
   };
 
+  const period = filterMode === "date"
+    ? { from: filterDate, to: filterDate }
+    : phPeriodBounds(rangeType);
+  const rangeStart = period.from;
+  const rangeEnd = period.to;
+  const isLiveRange = rangeStart === getTodayDate() && rangeEnd === getTodayDate();
+
+  function inDateRange(value: string) {
+    const day = phDateString(value);
+    return day >= rangeStart && day <= rangeEnd;
+  }
+
   const filteredTransactions = transactions.filter((t) => {
     const matchesKw = t.productName.toLowerCase().includes(filterKeyword.toLowerCase());
     const matchesTp = filterType === "All" || t.type === filterType;
-    const matchesDate = !selectedDateFilter || t.date === selectedDateFilter;
-    return matchesKw && matchesTp && matchesDate;
+    return matchesKw && matchesTp && inDateRange(t.date);
   });
 
   const filteredUsages = usages.filter((u) => {
     const matchesKw = u.itemName.toLowerCase().includes(filterKeyword.toLowerCase());
-    const matchesDate = !selectedDateFilter || phDateString(u.date) === selectedDateFilter;
-    return matchesKw && matchesDate;
+    return matchesKw && inDateRange(u.date);
   });
+
+  const dateRangeFilter = (
+    <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+      <div
+        className={`flex min-w-0 items-center gap-2 rounded-lg border px-3 py-2 sm:py-1.5 ${
+          filterMode === "range" ? "border-black bg-white ring-1 ring-black" : "border-neutral-400 bg-white opacity-75"
+        }`}
+      >
+        <span className="shrink-0 text-xs font-medium text-neutral-500">Range:</span>
+        <select
+          value={rangeType}
+          onChange={(event) => {
+            setRangeType(event.target.value as PeriodRange);
+            setFilterMode("range");
+          }}
+          onClick={() => setFilterMode("range")}
+          className="min-w-0 flex-1 cursor-pointer bg-transparent text-sm outline-none"
+        >
+          <option value="today">Today</option>
+          <option value="week">This Week</option>
+          <option value="lastWeek">Last Week</option>
+          <option value="month">This Month</option>
+          <option value="lastMonth">Last Month</option>
+          <option value="thisYear">This Year</option>
+          <option value="lastYear">Last Year</option>
+        </select>
+      </div>
+      <div
+        className={`flex min-w-0 items-center gap-2 rounded-lg border px-3 py-2 sm:py-1.5 ${
+          filterMode === "date" ? "border-black bg-white ring-1 ring-black" : "border-neutral-400 bg-white opacity-75"
+        }`}
+      >
+        <span className="shrink-0 text-xs font-medium text-neutral-500">Date:</span>
+        <input
+          type="date"
+          value={filterDate}
+          onChange={(event) => {
+            setFilterDate(event.target.value);
+            setFilterMode("date");
+          }}
+          onClick={() => setFilterMode("date")}
+          className="min-w-0 flex-1 cursor-pointer bg-transparent text-sm outline-none"
+        />
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen min-w-0 space-y-6 rounded-none border-0 border-neutral-300 bg-white p-3 sm:rounded-xl sm:border sm:p-6">
@@ -650,17 +718,15 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
         ))}
       </div>
 
+      {dateRangeFilter}
+
       {activeTab === "transactions" && (
         <div className="space-y-6">
           <div className="bg-neutral-50 p-4 rounded-lg border border-neutral-400 shadow-sm space-y-4">
             <div className="text-xs font-bold text-neutral-700 uppercase tracking-wide border-b border-neutral-300 pb-1">
               {editTxId ? "Edit Transaction" : "New Transaction"}
             </div>
-            <form onSubmit={handleSaveTransaction} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-4 items-end">
-              <div>
-                <label className="block text-xs font-medium text-neutral-600 mb-1">Date</label>
-                <input type="date" value={txDate} onChange={(e) => setTxDate(e.target.value)} className="w-full bg-white border border-neutral-400 rounded px-3 py-1.5 text-sm" />
-              </div>
+            <form onSubmit={handleSaveTransaction} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 items-end">
               <div>
                 <label className="block text-xs font-medium text-neutral-600 mb-1">Product Name</label>
                 <input type="text" placeholder="e.g. Iced Latte" value={txProduct} onChange={(e) => setTxProduct(e.target.value)} className="w-full bg-white border border-neutral-400 rounded px-3 py-1.5 text-sm" />
@@ -688,11 +754,6 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
           </div>
 
           <div className="flex flex-wrap gap-4 items-center bg-neutral-50 p-3 rounded-lg border border-neutral-400 text-sm">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-neutral-600">Filter Date:</span>
-              <input type="date" value={selectedDateFilter} onChange={(e) => setSelectedDateFilter(e.target.value)} className="bg-white border border-neutral-400 rounded px-2 py-1 text-xs" />
-              {selectedDateFilter && <button onClick={() => setSelectedDateFilter("")} className="text-xs text-black underline">Reset</button>}
-            </div>
             <div className="flex items-center gap-2">
               <span className="text-xs text-neutral-600">Type:</span>
               <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="bg-white border border-neutral-400 rounded px-2 py-1 text-xs">
@@ -722,7 +783,7 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
               </thead>
               <tbody>
                 {filteredTransactions.length === 0 ? (
-                  <tr><td colSpan={7} className="p-4 text-center text-neutral-500 text-xs">No transactions found for this date.</td></tr>
+                  <tr><td colSpan={7} className="p-4 text-center text-neutral-500 text-xs">No transactions found for this date range.</td></tr>
                 ) : (
                   filteredTransactions.map((t) => (
                     <tr key={t.id} className="border-b border-neutral-200 hover:bg-neutral-50 text-xs">
@@ -750,11 +811,6 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
       {activeTab === "stock" && (
         <div className="space-y-6">
           {stockNotice ? <p className="text-sm text-red-600">{stockNotice}</p> : null}
-          <div className="flex flex-wrap gap-3 bg-neutral-50 p-3 rounded-lg border border-neutral-400 text-sm">
-            <label className="text-xs text-neutral-600">Filter date:</label>
-            <input type="date" value={selectedDateFilter} onChange={(e) => setSelectedDateFilter(e.target.value)} className="bg-white border border-neutral-400 rounded px-2 py-1 text-xs" />
-            {selectedDateFilter && <button onClick={() => setSelectedDateFilter("")} className="text-xs text-black underline">Reset</button>}
-          </div>
           <div className="bg-neutral-50 p-4 rounded-lg border border-neutral-400 space-y-4">
             <h3 className="text-xs font-bold text-neutral-700 uppercase">{editStockId ? "Edit Stock Item" : "Add Stock Item"}</h3>
             <form onSubmit={handleSaveStock} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 items-end">
@@ -798,15 +854,15 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
               </thead>
               <tbody>
                 {stocks.map((s) => {
-                  const currentDateStr = selectedDateFilter || getTodayDate();
-                  const { opening, restocked, used, remaining } = stockLedgerForDate({
+                  const { opening, restocked, used, remaining } = stockLedgerForRange({
                     itemName: s.name,
                     liveStock: s.stock,
-                    date: currentDateStr,
+                    from: rangeStart,
+                    to: rangeEnd,
                     restocks,
                     usages,
                   });
-                  const isLiveDate = currentDateStr === getTodayDate();
+                  const isLiveDate = isLiveRange;
                   const recipe = costingIngredientForItem(costings, s.name);
                   const cupsLeft = recipe ? cupsFromQuantity(remaining, recipe) : null;
 
@@ -900,11 +956,7 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
         <div className="space-y-6">
           <div className="bg-neutral-50 p-4 rounded-lg border border-neutral-400 space-y-4">
             <h3 className="text-xs font-bold text-neutral-700 uppercase">{editRestockId ? "Edit Restock Record" : "Add Restock Record"}</h3>
-            <form onSubmit={handleSaveRestock} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
-              <div>
-                <label className="block text-xs font-medium text-neutral-600 mb-1">Restock Date</label>
-                <input type="date" value={restockDate} onChange={(e) => setRestockDate(e.target.value)} className="w-full bg-white border border-neutral-400 rounded px-3 py-1.5 text-sm" />
-              </div>
+            <form onSubmit={handleSaveRestock} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end">
               <div>
                 <label className="block text-xs font-medium text-neutral-600 mb-1">Item Name</label>
                 <input type="text" placeholder="e.g. Coffee Beans" value={restockItem} onChange={(e) => setRestockItem(e.target.value)} className="w-full bg-white border border-neutral-400 rounded px-3 py-1.5 text-sm" />
@@ -933,9 +985,9 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
               </thead>
               <tbody>
                 {(() => {
-                  const filteredRestocks = restocks.filter((r) => !selectedDateFilter || phDateString(r.date) === selectedDateFilter);
-                  if (selectedDateFilter && filteredRestocks.length === 0) {
-                    return <tr><td colSpan={5} className="p-8 text-center text-sm text-neutral-500">No restock data for {selectedDateFilter}.</td></tr>;
+                  const filteredRestocks = restocks.filter((r) => inDateRange(r.date));
+                  if (filteredRestocks.length === 0) {
+                    return <tr><td colSpan={5} className="p-8 text-center text-sm text-neutral-500">No restock data for this date range.</td></tr>;
                   }
                   return filteredRestocks.map((r) => (
                   <tr key={r.id} className="border-b border-neutral-200 text-xs">
@@ -1018,7 +1070,7 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                   <th className="p-3 border-r border-white/15">Item</th>
                   <th className="p-3 border-r border-white/15">Pack recipe</th>
                   <th className="p-3 border-r border-white/15">Per cup</th>
-                  <th className="p-3 border-r border-white/15 text-right">Used today</th>
+                  <th className="p-3 border-r border-white/15 text-right">{isLiveRange ? "Used today" : "Used"}</th>
                   <th className="p-3 border-r border-white/15 text-right">Stock</th>
                   <th className="p-3 border-r border-white/15 text-right">Cups left</th>
                   <th className="p-3 text-center">Actions</th>
@@ -1030,7 +1082,7 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                   const stock = stocks.find((item) => namesMatch(item.name, c.productName) || (ing ? namesMatch(item.name, ing.name) : false));
                   const remaining = stock?.stock ?? 0;
                   const used = usages
-                    .filter((entry) => phDateString(entry.date) === (selectedDateFilter || getTodayDate()))
+                    .filter((entry) => inDateRange(entry.date))
                     .filter((entry) => namesMatch(entry.itemName, c.productName) || (ing ? namesMatch(entry.itemName, ing.name) : false))
                     .reduce((sum, entry) => sum + entry.usedAmount, 0);
                   const perCup = ing ? perCupAmount(ing) : 0;
@@ -1069,11 +1121,6 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
 
       {activeTab === "used" && (
         <div className="space-y-6">
-          <div className="flex flex-wrap gap-3 bg-neutral-50 p-3 rounded-lg border border-neutral-400 text-sm">
-            <label className="text-xs text-neutral-600">Filter date:</label>
-            <input type="date" value={selectedDateFilter} onChange={(e) => setSelectedDateFilter(e.target.value)} className="bg-white border border-neutral-400 rounded px-2 py-1 text-xs" />
-            {selectedDateFilter && <button onClick={() => setSelectedDateFilter("")} className="text-xs text-black underline">Reset</button>}
-          </div>
           <div className="overflow-x-auto rounded-lg border border-neutral-400 bg-white">
             <table className="w-full min-w-[760px] text-left text-sm">
               <thead>

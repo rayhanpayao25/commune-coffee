@@ -36,8 +36,24 @@ export function stockLedgerForDate(input: {
   restocks: { itemName: string; quantityAdded: number; date: string }[];
   usages: { itemName: string; usedAmount: number; date: string }[];
 }): { opening: number; restocked: number; used: number; remaining: number } {
-  const onDate = (value: string) => phDateString(value) === input.date;
-  const afterDate = (value: string) => phDateString(value) > input.date;
+  return stockLedgerForRange({ ...input, from: input.date, to: input.date });
+}
+
+export function stockLedgerForRange(input: {
+  itemName: string;
+  liveStock: number;
+  from: string;
+  to: string;
+  restocks: { itemName: string; quantityAdded: number; date: string }[];
+  usages: { itemName: string; usedAmount: number; date: string }[];
+}): { opening: number; restocked: number; used: number; remaining: number } {
+  const from = input.from <= input.to ? input.from : input.to;
+  const to = input.from <= input.to ? input.to : input.from;
+  const afterEnd = (value: string) => phDateString(value) > to;
+  const inRange = (value: string) => {
+    const day = phDateString(value);
+    return day >= from && day <= to;
+  };
 
   const sumRestocks = (
     rows: { itemName: string; quantityAdded: number; date: string }[],
@@ -59,10 +75,10 @@ export function stockLedgerForDate(input: {
         .reduce((sum, row) => sum + (Number(row.usedAmount) || 0), 0),
     );
 
-  const restocked = sumRestocks(input.restocks, onDate);
-  const used = sumUsages(input.usages, onDate);
+  const restocked = sumRestocks(input.restocks, inRange);
+  const used = sumUsages(input.usages, inRange);
   const remaining = roundQty(
-    Math.max(0, input.liveStock - sumRestocks(input.restocks, afterDate) + sumUsages(input.usages, afterDate)),
+    Math.max(0, input.liveStock - sumRestocks(input.restocks, afterEnd) + sumUsages(input.usages, afterEnd)),
   );
   const opening = roundQty(remaining - restocked + used);
   return { opening, restocked, used, remaining };
