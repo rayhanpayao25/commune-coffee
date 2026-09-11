@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { deleteAdminRecord, saveAdminData } from "@/actions/pos";
 import { costingIngredientForItem, cupsFromQuantity, formatQty, namesMatch, perCupAmount, remainingForUsages, roundQty, stockLedgerForDate } from "@/lib/inventory";
 import { phDateString, phDateTimeLabel, phIsoFromDate, phNowDateTime } from "@/lib/datetime";
@@ -141,6 +141,8 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
   const [transactions, setTransactions] = useState<Transaction[]>(persistedTransactions);
 
   const [stocks, setStocks] = useState<StockItem[]>(persistedStocks);
+  const stocksRef = useRef(stocks);
+  stocksRef.current = stocks;
 
   const [restocks, setRestocks] = useState<RestockRecord[]>(store.restocks ?? []);
   const [costings, setCostings] = useState<CostingItem[]>(store.costings ?? []);
@@ -844,13 +846,11 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                           onBlur={(e) => {
                             if (!isLiveDate) return;
                             const nextStock = Math.max(0, Number(e.target.value) || 0);
-                            setStocks((currentStocks) => {
-                              const nextStocks = currentStocks.map((item) =>
-                                item.id === s.id ? { ...item, stock: nextStock } : item,
-                              );
-                              void persistInventory(nextStocks);
-                              return nextStocks;
-                            });
+                            const nextStocks = stocksRef.current.map((item) =>
+                              item.id === s.id ? { ...item, stock: nextStock } : item,
+                            );
+                            setStocks(nextStocks);
+                            void persistInventory(nextStocks);
                           }}
                           className="w-24 bg-white border border-neutral-400 rounded px-2 py-1 text-right font-bold"
                         />

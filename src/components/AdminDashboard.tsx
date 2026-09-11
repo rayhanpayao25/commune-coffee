@@ -136,6 +136,13 @@ function toInputDateStr(date: Date) {
   }).format(date);
 }
 
+function entryInPeriod(dateStr: string, start: Date, end: Date) {
+  const dayStart = new Date(`${dateStr}T00:00:00+08:00`).getTime();
+  const dayEnd = new Date(`${dateStr}T23:59:59.999+08:00`).getTime();
+  if (Number.isNaN(dayStart) || Number.isNaN(dayEnd)) return false;
+  return dayStart <= end.getTime() && dayEnd >= start.getTime();
+}
+
 export function AdminDashboard({ store }: { store: StoreData }) {
   const [isClient, setIsClient] = useState(false);
   const [filterDateStr, setFilterDateStr] = useState("");
@@ -332,8 +339,10 @@ export function AdminDashboard({ store }: { store: StoreData }) {
   
   const payments = paymentStats(filteredOrdersList);
   const totalSalesAmount = sumSales(filteredOrdersList);
-  const totalExpensesAmount = expenses.reduce((sum, e) => sum + e.amount, 0);
-  const totalCreditsAmount = credits.reduce((sum, c) => sum + c.amount, 0);
+  const periodExpenses = expenses.filter((entry) => entryInPeriod(entry.date, startOfPeriod, now));
+  const periodCredits = credits.filter((entry) => entryInPeriod(entry.date, startOfPeriod, now));
+  const totalExpensesAmount = periodExpenses.reduce((sum, e) => sum + e.amount, 0);
+  const totalCreditsAmount = periodCredits.reduce((sum, c) => sum + c.amount, 0);
 
   const netProfitOrLoss = totalSalesAmount - (totalExpensesAmount + totalCreditsAmount);
 
