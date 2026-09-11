@@ -10,6 +10,7 @@ import {
   sessionCookieOptions,
 } from "@/lib/auth";
 import { getStore, recordAuthActivity } from "@/lib/store";
+import { loginPathForRole, normalizeLoginGates } from "@/lib/staff-gates";
 import { parseLoginRole, toSession } from "@/lib/users";
 
 export type LoginState = {
@@ -72,5 +73,18 @@ export async function logout() {
   }
   const jar = await cookies();
   jar.delete(SESSION_COOKIE);
+
+  if (session?.role === "admin") {
+    let adminPath = "/";
+    try {
+      const store = await getStore();
+      const gates = normalizeLoginGates(store.loginGates);
+      adminPath = loginPathForRole("admin", gates);
+    } catch {
+      // gate resolution failed — fall back to landing page
+    }
+    redirect(adminPath);
+  }
+
   redirect("/");
 }
