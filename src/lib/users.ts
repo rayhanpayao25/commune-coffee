@@ -64,9 +64,9 @@ export function parseRole(value: string): Role {
   return "barista";
 }
 
-export function parseLoginRole(value: string): "admin" | "cashier" | "manager" | null {
+export function parseLoginRole(value: string): "admin" | "cashier" | null {
   const normalized = value.toLowerCase();
-  if (normalized === "admin" || normalized === "cashier" || normalized === "manager") {
+  if (normalized === "admin" || normalized === "cashier") {
     return normalized;
   }
   return null;

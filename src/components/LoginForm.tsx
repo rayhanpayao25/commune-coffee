@@ -14,11 +14,6 @@ const ROLES = [
     label: "Cashier",
     note: "POS only",
   },
-  {
-    id: "manager",
-    label: "Manager",
-    note: "Void transactions only",
-  },
 ] as const;
 
 const initial: LoginState = {};
@@ -34,7 +29,7 @@ export function LoginForm() {
   return (
     <form action={action} className="w-full max-w-md space-y-6">
       <input type="hidden" name="role" value={role} />
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         {ROLES.map((item) => (
           <button
             key={item.id}

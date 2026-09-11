@@ -25,7 +25,7 @@ export async function login(
   const selectedRole = parseLoginRole(String(formData.get("role") ?? ""));
 
   if (!selectedRole) {
-    return { error: "Select Admin, Cashier, or Manager." };
+    return { error: "Select Admin or Cashier." };
   }
   if (!username || !password) {
     return { error: "Enter a username and password." };
