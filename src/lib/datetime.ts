@@ -65,6 +65,26 @@ export function phDateTimeLabel(value: string | Date): string {
   }).format(date);
 }
 
+export function phDateTimeInputValue(value: string | Date): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const { year, month, day, hour, minute } = partsOf(date);
+  return `${year}-${month}-${day}T${hour}:${minute}`;
+}
+
+export function phIsoFromDateTimeInput(value: string): string {
+  const input = value.trim();
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(input)) return "";
+
+  const date = new Date(`${input}:00+08:00`);
+  if (Number.isNaN(date.getTime()) || phDateTimeInputValue(date) !== input) {
+    return "";
+  }
+
+  return date.toISOString();
+}
+
 export function phNowDateTime(value: Date = new Date()): string {
   const { year, month, day, hour, minute, second } = partsOf(value);
   return `${year}-${month}-${day} ${hour}:${minute}:${second}`;

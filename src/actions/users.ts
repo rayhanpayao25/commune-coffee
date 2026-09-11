@@ -9,7 +9,7 @@ import {
   sessionCookieOptions,
 } from "@/lib/auth";
 import { updateStore } from "@/lib/store";
-import { phDateString } from "@/lib/datetime";
+import { phDateString, phIsoFromDateTimeInput } from "@/lib/datetime";
 import {
   parseRole,
   staffUserId,
@@ -233,6 +233,62 @@ export async function punchStaff(userId: string, type: "login" | "logout") {
     });
     if (store.loginActivity.length > 300) store.loginActivity.length = 300;
   });
+  if (error) return { error };
+  refresh();
+  return { ok: true };
+}
+
+export async function updateStaffSessionTimes(input: {
+  loginId?: string;
+  loginAt?: string;
+  logoutId?: string;
+  logoutAt?: string;
+}) {
+  await requireAdmin();
+
+  if (!input.loginId && !input.logoutId) {
+    return { error: "No in / off time was selected." };
+  }
+
+  const loginAt = input.loginId ? phIsoFromDateTimeInput(input.loginAt ?? "") : undefined;
+  const logoutAt = input.logoutId ? phIsoFromDateTimeInput(input.logoutAt ?? "") : undefined;
+  if ((input.loginId && !loginAt) || (input.logoutId && !logoutAt)) {
+    return { error: "Enter a valid date and time." };
+  }
+
+  let error: string | undefined;
+  await updateStore((store) => {
+    const login = input.loginId
+      ? store.loginActivity.find((entry) => entry.id === input.loginId && entry.type === "login")
+      : undefined;
+    const logout = input.logoutId
+      ? store.loginActivity.find((entry) => entry.id === input.logoutId && entry.type === "logout")
+      : undefined;
+
+    if ((input.loginId && !login) || (input.logoutId && !logout)) {
+      error = "In / off record not found.";
+      return;
+    }
+    if (login && logout && login.userId !== logout.userId) {
+      error = "The in and off records do not belong to the same staff member.";
+      return;
+    }
+
+    const nextLoginAt = loginAt ?? login?.at;
+    const nextLogoutAt = logoutAt ?? logout?.at;
+    if (
+      nextLoginAt &&
+      nextLogoutAt &&
+      new Date(nextLogoutAt).getTime() < new Date(nextLoginAt).getTime()
+    ) {
+      error = "Off time cannot be earlier than in time.";
+      return;
+    }
+
+    if (login && loginAt) login.at = loginAt;
+    if (logout && logoutAt) logout.at = logoutAt;
+  });
+
   if (error) return { error };
   refresh();
   return { ok: true };

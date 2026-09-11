@@ -9,10 +9,11 @@ import {
   punchStaff,
   setOffRequestStatus,
   updateLoginGates,
+  updateStaffSessionTimes,
   updateStaffUser,
 } from "@/actions/users";
 import type { PublicStaffUser } from "@/lib/users";
-import { phDateString, phDateTimeLabel } from "@/lib/datetime";
+import { phDateString, phDateTimeInputValue, phDateTimeLabel } from "@/lib/datetime";
 import type { LoginActivity, OffRequest, Session } from "@/lib/types";
 import type { LoginGates } from "@/lib/staff-gates";
 
@@ -35,6 +36,8 @@ type StaffSession = {
   userId: string;
   username: string;
   name: string;
+  loginId: string | null;
+  logoutId: string | null;
   loginAt: string | null;
   logoutAt: string | null;
 };
@@ -54,6 +57,8 @@ function pairLoginSessions(records: LoginActivity[]): StaffSession[] {
         userId: record.userId,
         username: record.username,
         name: record.name,
+        loginId: record.id,
+        logoutId: null,
         loginAt: record.at,
         logoutAt: null,
       };
@@ -63,6 +68,7 @@ function pairLoginSessions(records: LoginActivity[]): StaffSession[] {
     } else {
       const unpaired = open.pop();
       if (unpaired) {
+        unpaired.logoutId = record.id;
         unpaired.logoutAt = record.at;
       } else {
         sessions.push({
@@ -70,6 +76,8 @@ function pairLoginSessions(records: LoginActivity[]): StaffSession[] {
           userId: record.userId,
           username: record.username,
           name: record.name,
+          loginId: null,
+          logoutId: record.id,
           loginAt: null,
           logoutAt: record.at,
         });
@@ -95,6 +103,9 @@ export function UserManager({ users, session, loginActivity, offRequests, loginG
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [punchUserId, setPunchUserId] = useState("");
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [editLoginAt, setEditLoginAt] = useState("");
+  const [editLogoutAt, setEditLogoutAt] = useState("");
   const [offUserId, setOffUserId] = useState("");
   const [offDate, setOffDate] = useState(phDateString());
   const [offReason, setOffReason] = useState("");
@@ -142,6 +153,13 @@ export function UserManager({ users, session, loginActivity, offRequests, loginG
   function resetForm() {
     setEditingId(null);
     setPassword("");
+  }
+
+  function startSessionEdit(row: StaffSession) {
+    setEditingSessionId(row.id);
+    setEditLoginAt(row.loginAt ? phDateTimeInputValue(row.loginAt) : "");
+    setEditLogoutAt(row.logoutAt ? phDateTimeInputValue(row.logoutAt) : "");
+    setNotice(null);
   }
 
   return (
@@ -411,26 +429,98 @@ export function UserManager({ users, session, loginActivity, offRequests, loginG
                     <th className="px-4 py-3">Staff</th>
                     <th className="px-4 py-3">In</th>
                     <th className="px-4 py-3">Off</th>
+                    <th className="px-4 py-3 text-right"> </th>
                   </tr>
                 </thead>
                 <tbody>
                   {sessions.length === 0 ? (
                     <tr>
-                      <td colSpan={3} className="px-4 py-8 text-center text-sm text-neutral-400">
+                      <td colSpan={4} className="px-4 py-8 text-center text-sm text-neutral-400">
                         No in / off records yet.
                       </td>
                     </tr>
                   ) : (
-                    sessions.map((row) => (
-                      <tr key={row.id} className="border-t border-neutral-100">
-                        <td className="px-4 py-3">
-                          <p className="font-medium">{row.name}</p>
-                          <p className="text-xs text-neutral-400">{row.username}</p>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">{row.loginAt ? phDateTimeLabel(row.loginAt) : "—"}</td>
-                        <td className="px-4 py-3 whitespace-nowrap">{row.logoutAt ? phDateTimeLabel(row.logoutAt) : "Still in"}</td>
-                      </tr>
-                    ))
+                    sessions.map((row) => {
+                      const isEditing = editingSessionId === row.id;
+                      return (
+                        <tr key={row.id} className="border-t border-neutral-100">
+                          <td className="px-4 py-3">
+                            <p className="font-medium">{row.name}</p>
+                            <p className="text-xs text-neutral-400">{row.username}</p>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {isEditing && row.loginId ? (
+                              <input
+                                type="datetime-local"
+                                value={editLoginAt}
+                                onChange={(event) => setEditLoginAt(event.target.value)}
+                                className={`${field} min-w-48`}
+                                required
+                              />
+                            ) : row.loginAt ? phDateTimeLabel(row.loginAt) : "—"}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {isEditing && row.logoutId ? (
+                              <input
+                                type="datetime-local"
+                                value={editLogoutAt}
+                                onChange={(event) => setEditLogoutAt(event.target.value)}
+                                className={`${field} min-w-48`}
+                                required
+                              />
+                            ) : row.logoutAt ? phDateTimeLabel(row.logoutAt) : "Still in"}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex justify-end gap-2 text-xs font-medium">
+                              {isEditing ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    disabled={pending}
+                                    onClick={() =>
+                                      startTransition(async () => {
+                                        const result = await updateStaffSessionTimes({
+                                          loginId: row.loginId ?? undefined,
+                                          loginAt: row.loginId ? editLoginAt : undefined,
+                                          logoutId: row.logoutId ?? undefined,
+                                          logoutAt: row.logoutId ? editLogoutAt : undefined,
+                                        });
+                                        if (result && "error" in result && result.error) {
+                                          setNotice(typeof result.error === "string" ? result.error : "Could not save.");
+                                          return;
+                                        }
+                                        setEditingSessionId(null);
+                                        setNotice("In / off time updated.");
+                                      })
+                                    }
+                                    className="hover:underline disabled:opacity-40"
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={pending}
+                                    onClick={() => setEditingSessionId(null)}
+                                    className="text-neutral-500 hover:underline disabled:opacity-40"
+                                  >
+                                    Cancel
+                                  </button>
+                                </>
+                              ) : (
+                                <button
+                                  type="button"
+                                  disabled={pending}
+                                  onClick={() => startSessionEdit(row)}
+                                  className="hover:underline disabled:opacity-40"
+                                >
+                                  Edit
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
