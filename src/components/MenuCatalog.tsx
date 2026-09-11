@@ -158,8 +158,8 @@ export function MenuCatalog({ menu, categories }: MenuCatalogProps) {
   }
 
   return (
-    <div className="min-h-screen w-full bg-neutral-50/30">
-      <div className="flex w-full gap-1 overflow-x-auto border-b border-neutral-200 bg-white px-4 sm:px-6">
+    <div className="min-h-screen min-w-0 space-y-6 rounded-none border-0 border-neutral-300 bg-white p-3 sm:rounded-xl sm:border sm:p-6">
+      <div className="flex gap-2 overflow-x-auto border-b border-neutral-400 pb-3">
         {(
           [
             { id: "items", label: "Items" },
@@ -170,10 +170,8 @@ export function MenuCatalog({ menu, categories }: MenuCatalogProps) {
             key={entry.id}
             type="button"
             onClick={() => setTab(entry.id)}
-            className={`shrink-0 px-3 py-3 text-sm font-medium ${
-              tab === entry.id
-                ? "-mb-px border-b-2 border-black text-black"
-                : "text-neutral-400 hover:text-neutral-700"
+            className={`shrink-0 px-4 py-1.5 rounded text-xs font-bold transition shadow-sm uppercase ${
+              tab === entry.id ? "bg-black text-white" : "bg-white text-neutral-700 hover:bg-neutral-100"
             }`}
           >
             {entry.label}
@@ -181,7 +179,7 @@ export function MenuCatalog({ menu, categories }: MenuCatalogProps) {
         ))}
       </div>
 
-      <div className="w-full space-y-5 px-4 py-6 sm:px-6">
+      <div className="w-full space-y-5">
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-xl font-semibold tracking-tight text-neutral-900">
             {tab === "categories" ? "Categories" : "Items"}
