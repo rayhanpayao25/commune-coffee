@@ -570,7 +570,7 @@ export function UserManager({ users, session, loginActivity, offRequests, loginG
                     setNotice(typeof result.error === "string" ? result.error : "Could not save.");
                     return;
                   }
-                  if (result && "admin" in result) {
+                  if (result && "ok" in result && result.ok) {
                     setAdminGate(result.admin);
                     setCashierGate(result.cashier);
                   }

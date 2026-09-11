@@ -300,7 +300,10 @@ export async function deleteOffRequest(id: string) {
   return { ok: true };
 }
 
-export async function updateLoginGates(adminPath: string, cashierPath: string) {
+export async function updateLoginGates(
+  adminPath: string,
+  cashierPath: string,
+): Promise<{ error: string } | { ok: true; admin: string; cashier: string }> {
   await requireAdmin();
   const admin = sanitizeLoginGate(adminPath);
   if (!admin.ok) return { error: admin.error };
