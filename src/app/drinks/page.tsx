@@ -11,7 +11,7 @@ export default async function DrinksPage() {
   return (
     <main className="min-h-screen bg-black text-white px-4 py-12 sm:px-6 sm:py-20">
       <div className="mx-auto max-w-5xl">
-        <div className="mb-6 flex items-center justify-start gap-5 sm:justify-between">
+        <div className="mb-6 flex items-center justify-between gap-5">
           <div>
             <p className="font-script text-2xl text-neutral-400">have a seat, take a sip</p>
             <h1 className="font-serif text-3xl italic sm:text-5xl mt-1">Commune Drinks</h1>
@@ -19,7 +19,7 @@ export default async function DrinksPage() {
           <Link
             href="/#menu"
             aria-label="Back to Home"
-            className="order-first inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/25 transition hover:bg-white hover:text-black sm:order-last sm:h-auto sm:w-auto sm:px-5 sm:py-2.5 sm:text-xs sm:uppercase sm:tracking-[0.18em]"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/25 transition hover:bg-white hover:text-black sm:h-auto sm:w-auto sm:px-5 sm:py-2.5 sm:text-xs sm:uppercase sm:tracking-[0.18em]"
           >
             <svg
               aria-hidden="true"
