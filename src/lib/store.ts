@@ -181,6 +181,8 @@ function normalizeStore(store: StoreData): StoreData {
     store.orders = store.orders.map((order: Order) => ({
       ...order,
       paymentMethod: parsePayment(order.paymentMethod),
+      voided: Boolean(order.voided),
+      voidReason: typeof order.voidReason === "string" ? order.voidReason : "",
     }));
   }
   if (!Array.isArray(store.menu) || store.menu.length === 0) {

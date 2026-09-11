@@ -39,6 +39,7 @@ export type Order = {
   paid?: number;
   change?: number;
   voided?: boolean;
+  voidReason?: string;
   recordType?: "Sale" | "Purchase";
 };
 

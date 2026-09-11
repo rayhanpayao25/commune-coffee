@@ -136,6 +136,10 @@ function toInputDateStr(date: Date) {
   }).format(date);
 }
 
+function isVoided(order: Order) {
+  return Boolean(order.voided) || Boolean(order.voidReason?.trim());
+}
+
 function entryInPeriod(dateStr: string, start: Date, end: Date) {
   const dayStart = new Date(`${dateStr}T00:00:00+08:00`).getTime();
   const dayEnd = new Date(`${dateStr}T23:59:59.999+08:00`).getTime();
@@ -919,12 +923,12 @@ export function AdminDashboard({ store }: { store: StoreData }) {
                     <p className="text-sm font-semibold">{formatMoney(order.total)}</p>
                     <span
                       className={`mt-1 inline-block rounded px-2 py-0.5 text-[10px] font-medium ${
-                        order.voided
+                        isVoided(order)
                           ? "bg-red-100 text-red-700"
                           : "bg-black text-white"
                       }`}
                     >
-                      {order.voided ? "Voided" : "Completed"}
+                      {isVoided(order) ? "Void" : "Completed"}
                     </span>
                   </div>
                 </div>
@@ -935,18 +939,24 @@ export function AdminDashboard({ store }: { store: StoreData }) {
                   {paymentLabel(order.paymentMethod)}
                   {order.promoLabel ? ` · ${order.promoLabel}` : ""}
                 </p>
+                {isVoided(order) ? (
+                  <p className="mt-2 text-[11px] text-neutral-500">
+                    Reason: {order.voidReason?.trim() || "—"}
+                  </p>
+                ) : null}
               </article>
             ))
           )}
         </div>
         <div className="mt-4 hidden overflow-x-auto md:block">
-          <table className="w-full min-w-[780px] text-left text-sm">
+          <table className="w-full min-w-[860px] text-left text-sm">
             <thead className="border-b border-neutral-200 text-neutral-500">
               <tr>
                 <th className="py-3 font-normal">Time</th>
-                <th className="py-3 font-normal">Barista</th>
+                <th className="py-3 font-normal">Cashier</th>
                 <th className="py-3 font-normal">Items</th>
                 <th className="py-3 font-normal">Status</th>
+                <th className="py-3 font-normal">Reason</th>
                 <th className="py-3 font-normal">Promo</th>
                 <th className="py-3 font-normal">Pay</th>
                 <th className="py-3 font-normal text-right">Total</th>
@@ -955,7 +965,7 @@ export function AdminDashboard({ store }: { store: StoreData }) {
             <tbody>
               {latest.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-6 text-center text-neutral-500">
+                  <td colSpan={8} className="py-6 text-center text-neutral-500">
                     No recent orders found for the selected range.
                   </td>
                 </tr>
@@ -981,13 +991,16 @@ export function AdminDashboard({ store }: { store: StoreData }) {
                     <td className="py-3">
                       <span
                         className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${
-                          order.voided
+                          isVoided(order)
                         ? "bg-red-100 text-red-700"
                         : "bg-black text-white"
                         }`}
                       >
-                        {order.voided ? "Voided" : "Completed"}
+                        {isVoided(order) ? "Void" : "Completed"}
                       </span>
+                    </td>
+                    <td className="max-w-[220px] py-3 text-neutral-500">
+                      {isVoided(order) ? order.voidReason?.trim() || "—" : "—"}
                     </td>
                     <td className="py-3 text-neutral-500">
                       {order.promoLabel ?? "—"}

@@ -118,6 +118,7 @@ function transactionToOrder(transaction: Transaction, existing?: Order): Order {
     paid: existing?.paid ?? transaction.amount,
     change: existing?.change,
     voided: existing?.voided,
+    voidReason: existing?.voidReason,
     recordType: transaction.type,
   };
 }

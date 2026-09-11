@@ -30,7 +30,7 @@ export function AdminShell({ session, users, store, children }: AdminShellProps)
   const router = useRouter();
 
   useEffect(() => {
-    if (panel !== "transactions") return;
+    if (panel !== "transactions" && panel !== "sales") return;
     const refreshTimer = window.setInterval(() => router.refresh(), 5000);
     return () => window.clearInterval(refreshTimer);
   }, [panel, router]);

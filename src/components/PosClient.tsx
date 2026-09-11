@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { logout } from "@/actions/auth";
-import { createOrder, openPos, verifyManager, voidOrder } from "@/actions/pos";
+import { createOrder, openPos, verifyManager, voidCheckout, voidOrder } from "@/actions/pos";
 import { ReceiptPreview } from "@/components/ReceiptPreview";
 import { formatMoney } from "@/lib/menu";
 import { phDateString, phDateTimeLabel } from "@/lib/datetime";
@@ -102,6 +102,7 @@ export function PosClient({
   const [promoId, setPromoId] = useState<string | null>(null);
   const [previewTicket, setPreviewTicket] = useState<ReceiptTicket | null>(null);
   const [lastTicket, setLastTicket] = useState<ReceiptTicket | null>(null);
+  const [lastOrderId, setLastOrderId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const printer = useReceiptPrinter();
@@ -198,6 +199,7 @@ export function PosClient({
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }, [orders, voidSearch, voidTodayOnly]);
   const selectedVoidOrder = orders.find((order) => order.id === voidTargetId);
+  const cashierPaidVoid = !isManager && cart.length === 0 ? lastOrderId : null;
   const canCharge = !isManager && pos.isOpen && cart.length > 0 && (!isCash || paid >= total);
 
   function addItem(id: string, name: string, price: number) {
@@ -251,16 +253,55 @@ export function PosClient({
         return;
       }
 
+      if (cart.length > 0) {
+        const result = await voidCheckout(
+          cart,
+          voidReason,
+          voidUsername,
+          voidPassword,
+          promoId,
+          paymentMethod,
+        );
+        if ("error" in result && result.error) {
+          setMessage(result.error);
+          return;
+        }
+        setCart([]);
+        setTendered("");
+        setPaymentMethod("cash");
+        setPromoId(null);
+        setPromoOpen(false);
+        setVoidUsername("");
+        setVoidPassword("");
+        setVoidReason("");
+        setVoidModalOpen(false);
+        setMessage("Checkout voided.");
+        return;
+      }
+
+      const targetId = voidTargetId || lastOrderId;
+      if (!targetId) {
+        setMessage("No ticket to void.");
+        return;
+      }
+      const result = await voidOrder(targetId, voidReason, voidUsername, voidPassword);
+      if ("error" in result && result.error) {
+        setMessage(result.error);
+        return;
+      }
       setCart([]);
       setTendered("");
       setPaymentMethod("cash");
       setPromoId(null);
       setPromoOpen(false);
+      setLastOrderId(null);
+      setLastTicket(null);
       setVoidUsername("");
       setVoidPassword("");
       setVoidReason("");
+      setVoidTargetId(null);
       setVoidModalOpen(false);
-      setMessage("Checkout voided.");
+      setMessage("Transaction voided.");
     });
   }
 
@@ -396,20 +437,34 @@ export function PosClient({
                 </p>
               </div>
 
-              {isManager && selectedVoidOrder ? (
+              {selectedVoidOrder || (cashierPaidVoid && lastTicket) ? (
                 <div className="mb-4 rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-left">
-                  <div className="flex items-baseline justify-between gap-3">
-                    <p className="text-sm font-semibold">
-                      Ticket #{selectedVoidOrder.ticketNo ?? selectedVoidOrder.id.slice(-4)}
-                    </p>
-                    <p className="text-sm font-semibold">{formatMoney(selectedVoidOrder.total)}</p>
-                  </div>
-                  <p className="mt-1 text-xs text-neutral-500">
-                    {phDateTimeLabel(selectedVoidOrder.createdAt)} · {selectedVoidOrder.baristaName}
-                  </p>
-                  <p className="mt-2 text-xs text-neutral-700">
-                    {selectedVoidOrder.items.map((item) => `${item.qty}× ${item.name}`).join(", ")}
-                  </p>
+                  {selectedVoidOrder ? (
+                    <>
+                      <div className="flex items-baseline justify-between gap-3">
+                        <p className="text-sm font-semibold">
+                          Ticket #{selectedVoidOrder.ticketNo ?? selectedVoidOrder.id.slice(-4)}
+                        </p>
+                        <p className="text-sm font-semibold">{formatMoney(selectedVoidOrder.total)}</p>
+                      </div>
+                      <p className="mt-1 text-xs text-neutral-500">
+                        {phDateTimeLabel(selectedVoidOrder.createdAt)} · {selectedVoidOrder.baristaName}
+                      </p>
+                      <p className="mt-2 text-xs text-neutral-700">
+                        {selectedVoidOrder.items.map((item) => `${item.qty}× ${item.name}`).join(", ")}
+                      </p>
+                    </>
+                  ) : lastTicket ? (
+                    <>
+                      <div className="flex items-baseline justify-between gap-3">
+                        <p className="text-sm font-semibold">Ticket #{lastTicket.ticketNo}</p>
+                        <p className="text-sm font-semibold">{formatMoney(lastTicket.total)}</p>
+                      </div>
+                      <p className="mt-2 text-xs text-neutral-700">
+                        {lastTicket.items.map((item) => `${item.qty}× ${item.name}`).join(", ")}
+                      </p>
+                    </>
+                  ) : null}
                 </div>
               ) : null}
 
@@ -900,8 +955,11 @@ export function PosClient({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setVoidModalOpen(true)}
-                  disabled={cart.length === 0}
+                  onClick={() => {
+                    setVoidTargetId(cart.length === 0 ? lastOrderId : null);
+                    setVoidModalOpen(true);
+                  }}
+                  disabled={cart.length === 0 && !lastOrderId}
                   className="rounded-lg border border-neutral-300 py-2 text-xs hover:border-black disabled:opacity-40 transition"
                 >
                   Void
@@ -929,6 +987,7 @@ export function PosClient({
                       ticketNo: result.ticketNo || ticket.ticketNo,
                     };
                     setLastTicket(saved);
+                    setLastOrderId(result.id ?? null);
                     setCart([]);
                     setTendered("");
                     setPaymentMethod("cash");

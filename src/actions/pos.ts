@@ -111,6 +111,7 @@ export async function createOrder(
   let error: string | undefined;
   let charged = 0;
   let ticketNo = "";
+  let createdId = "";
 
   await updateStore((store) => {
     if (!store.pos.isOpen) {
@@ -189,6 +190,7 @@ export async function createOrder(
     charged = total;
     ticketNo = nextTicketNo(store.orders);
     const orderId = `ord-${Date.now()}`;
+    createdId = orderId;
     const createdAt = new Date().toISOString();
     const usageByItem = new Map<string, StoreData["usageLogs"][number]>();
 
@@ -237,6 +239,7 @@ export async function createOrder(
       ticketNo,
       paid: cashIn,
       change: method === "cash" ? cashIn - total : 0,
+      voided: false,
     });
   });
 
@@ -244,7 +247,7 @@ export async function createOrder(
 
   revalidatePath("/pos");
   revalidatePath("/admin");
-  return { ok: true, total: charged, ticketNo };
+  return { ok: true, total: charged, ticketNo, id: createdId };
 }
 
 export async function verifyManager(username: string, password: string) {
@@ -290,10 +293,94 @@ export async function voidOrder(
       return;
     }
     order.voided = true;
+    order.voidReason = reason.trim();
   });
 
   if (error) return { error };
   revalidatePath("/pos");
   revalidatePath("/admin");
   return { ok: true };
+}
+
+export async function voidCheckout(
+  cart: OrderItem[],
+  reason: string,
+  managerUsername: string,
+  managerPassword: string,
+  promoId?: string | null,
+  paymentMethod?: string | null,
+) {
+  const session = await requireCashier();
+  if (!reason.trim()) {
+    return { error: "Enter a reason for voiding." };
+  }
+  if (cart.length === 0) {
+    return { error: "No items to void." };
+  }
+
+  const auth = await verifyManager(managerUsername, managerPassword);
+  if ("error" in auth) return auth;
+
+  let error: string | undefined;
+  let createdId = "";
+
+  await updateStore((store) => {
+    const priced: OrderItem[] = [];
+    for (const line of cart) {
+      const menuItem = store.menu.find((item) => item.id === line.productId);
+      const qty = Number(line.qty);
+      if (!menuItem) {
+        error = "One of the items is no longer on the menu.";
+        return;
+      }
+      if (!Number.isSafeInteger(qty) || qty < 1 || qty > 99) {
+        error = "Each item quantity must be a whole number from 1 to 99.";
+        return;
+      }
+      priced.push({
+        productId: menuItem.id,
+        name: menuItem.name,
+        qty,
+        price: menuItem.price,
+      });
+    }
+
+    const subtotal = priced.reduce((sum, item) => sum + item.price * item.qty, 0);
+    let discount = 0;
+    let promoLabel: string | undefined;
+    if (promoId) {
+      const found = store.promotions.find((entry) => entry.id === promoId && entry.active);
+      if (found) {
+        promoLabel = found.label;
+        discount =
+          found.type === "percent"
+            ? Math.round((subtotal * found.value) / 100)
+            : Math.min(subtotal, Math.round(found.value));
+      }
+    }
+    const total = Math.max(0, subtotal - discount);
+    const orderId = `ord-${Date.now()}`;
+    createdId = orderId;
+    store.orders.push({
+      id: orderId,
+      createdAt: new Date().toISOString(),
+      baristaName: session.name,
+      items: priced,
+      subtotal,
+      discount,
+      promoLabel,
+      total,
+      paymentMethod: parsePayment(paymentMethod),
+      ticketNo: nextTicketNo(store.orders),
+      paid: 0,
+      change: 0,
+      voided: true,
+      voidReason: reason.trim(),
+    });
+  });
+
+  if (error) return { error };
+  revalidatePath("/pos");
+  revalidatePath("/admin");
+  return { ok: true, id: createdId };
 }
