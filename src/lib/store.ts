@@ -249,25 +249,6 @@ function normalizeStore(store: StoreData): StoreData {
     });
   }
 
-  if (!store.inventory.some((item) => item.id === "sugar" || /^sugar$/i.test(item.name))) {
-    store.inventory.push({
-      id: "sugar",
-      name: "Sugar",
-      category: "Ingredients",
-      unit: "grams",
-      cost: 80,
-      stock: 1000,
-      maxStock: 5000,
-    });
-  }
-  if (!store.costings.some((costing) => costing.id === "cost-sugar" || /^sugar$/i.test(costing.productName))) {
-    store.costings.push({
-      id: "cost-sugar",
-      productName: "Sugar",
-      ingredients: [{ name: "Sugar", amount: 1000, unit: "grams", outputCups: 100 }],
-    });
-  }
-
   if (!Array.isArray(store.users) || store.users.length === 0) {
     store.users = DEFAULT_USERS.map((item) => ({ ...item }));
   } else {

@@ -180,6 +180,7 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
   ]);
 
   const [inlineRestockValues, setInlineRestockValues] = useState<{ [key: string]: string }>({});
+  const [stockNotice, setStockNotice] = useState<string | null>(null);
 
   const [filterType, setFilterType] = useState("All");
   const [filterKeyword, setFilterKeyword] = useState("");
@@ -315,25 +316,20 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
   };
 
   async function persistInventory(nextStocks: StockItem[]) {
-    const byId = new Map(nextStocks.map((item) => [item.id, item]));
-    const inventory = store.inventory.map((item) => {
-      const next = byId.get(item.id);
-      return next
-        ? { ...item, name: next.name, category: next.category, stock: next.stock, unit: next.unit || item.unit }
-        : item;
-    });
-    const created = nextStocks
-      .filter((item) => !store.inventory.some((entry) => entry.id === item.id))
-      .map((item) => ({
+    const existingById = new Map(store.inventory.map((item) => [item.id, item]));
+    const inventory = nextStocks.map((item) => {
+      const existing = existingById.get(item.id);
+      return {
         id: item.id,
         name: item.name,
-        category: item.category,
+        category: item.category || existing?.category || "",
         stock: item.stock,
-        unit: item.unit || "pcs",
-        cost: 0,
-        maxStock: item.stock,
-      }));
-    await saveAdminData({ inventory: [...inventory, ...created] });
+        unit: item.unit || existing?.unit || "pcs",
+        cost: existing?.cost ?? 0,
+        maxStock: existing?.maxStock ?? item.stock,
+      };
+    });
+    await saveAdminData({ inventory });
   }
 
   const handleSaveTransaction = async (e: React.FormEvent) => {
@@ -493,8 +489,15 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
   };
 
   const handleDeleteStock = async (id: string) => {
-    setStocks((current) => current.filter((s) => s.id !== id));
-    await deleteAdminRecord("inventory", id);
+    const nextStocks = stocks.filter((s) => s.id !== id);
+    setStocks(nextStocks);
+    setStockNotice(null);
+    try {
+      await persistInventory(nextStocks);
+    } catch (error) {
+      setStocks(stocks);
+      setStockNotice(error instanceof Error ? error.message : "Could not delete that stock item.");
+    }
   };
 
   const handleInlineRestock = async (item: StockItem) => {
@@ -744,6 +747,7 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
 
       {activeTab === "stock" && (
         <div className="space-y-6">
+          {stockNotice ? <p className="text-sm text-red-600">{stockNotice}</p> : null}
           <div className="flex flex-wrap gap-3 bg-neutral-50 p-3 rounded-lg border border-neutral-400 text-sm">
             <label className="text-xs text-neutral-600">Filter date:</label>
             <input type="date" value={selectedDateFilter} onChange={(e) => setSelectedDateFilter(e.target.value)} className="bg-white border border-neutral-400 rounded px-2 py-1 text-xs" />
@@ -840,11 +844,13 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                           onBlur={(e) => {
                             if (!isLiveDate) return;
                             const nextStock = Math.max(0, Number(e.target.value) || 0);
-                            const nextStocks = stocks.map((item) =>
-                              item.id === s.id ? { ...item, stock: nextStock } : item,
-                            );
-                            setStocks(nextStocks);
-                            void persistInventory(nextStocks);
+                            setStocks((currentStocks) => {
+                              const nextStocks = currentStocks.map((item) =>
+                                item.id === s.id ? { ...item, stock: nextStock } : item,
+                              );
+                              void persistInventory(nextStocks);
+                              return nextStocks;
+                            });
                           }}
                           className="w-24 bg-white border border-neutral-400 rounded px-2 py-1 text-right font-bold"
                         />
@@ -871,8 +877,15 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                         </div>
                       </td>
                       <td className="p-3 text-center space-x-2">
-                        <button onClick={() => handleEditStock(s)} className="text-black hover:underline font-medium text-xs">Edit</button>
-                        <button onClick={() => handleDeleteStock(s.id)} className="text-red-600 hover:underline font-medium text-xs">Delete</button>
+                        <button type="button" onClick={() => handleEditStock(s)} className="text-black hover:underline font-medium text-xs">Edit</button>
+                        <button
+                          type="button"
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => void handleDeleteStock(s.id)}
+                          className="text-red-600 hover:underline font-medium text-xs"
+                        >
+                          Delete
+                        </button>
                       </td>
                     </tr>
                   );
