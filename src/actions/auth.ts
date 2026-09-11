@@ -74,16 +74,23 @@ export async function logout() {
   const jar = await cookies();
   jar.delete(SESSION_COOKIE);
 
-  if (session?.role === "admin") {
-    let adminPath = "/";
+  const gateRole =
+    session?.role === "admin"
+      ? "admin"
+      : session?.role === "cashier" || session?.role === "manager"
+        ? "cashier"
+        : null;
+
+  if (gateRole) {
+    let loginPath = "/";
     try {
       const store = await getStore();
       const gates = normalizeLoginGates(store.loginGates);
-      adminPath = loginPathForRole("admin", gates);
+      loginPath = loginPathForRole(gateRole, gates);
     } catch {
       // gate resolution failed — fall back to landing page
     }
-    redirect(adminPath);
+    redirect(loginPath);
   }
 
   redirect("/");
