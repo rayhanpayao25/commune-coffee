@@ -256,7 +256,6 @@ export function PosClient({
       setPaymentMethod("cash");
       setPromoId(null);
       setPromoOpen(false);
-      setSwipeOpenId(null);
       setVoidUsername("");
       setVoidPassword("");
       setVoidReason("");
@@ -935,7 +934,6 @@ export function PosClient({
                     setPaymentMethod("cash");
                     setPromoId(null);
                     setPromoOpen(false);
-                    setSwipeOpenId(null);
                     if (printer.connected) {
                       try {
                         await printer.print(saved);
