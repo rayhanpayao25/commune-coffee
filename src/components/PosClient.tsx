@@ -216,21 +216,6 @@ export function PosClient({
     setMessage(null);
   }
 
-  function decreaseItem(id: string) {
-    setCart((current) =>
-      current.flatMap((item) => {
-        if (item.productId !== id) return [item];
-        return item.qty > 1 ? [{ ...item, qty: item.qty - 1 }] : [];
-      }),
-    );
-    setMessage(null);
-  }
-
-  function removeItem(id: string) {
-    setCart((current) => current.filter((item) => item.productId !== id));
-    setMessage(null);
-  }
-
   function handleConfirmVoid(e: React.FormEvent) {
     e.preventDefault();
     if (!voidReason.trim()) {
@@ -754,10 +739,10 @@ export function PosClient({
             <h2 className="shrink-0 py-2.5 text-center text-lg font-semibold">
               Checkout
             </h2>
-            <div className="grid grid-cols-[minmax(0,1fr)_5.25rem_4rem] gap-x-2 px-3 text-[10px] tracking-wide text-neutral-400 uppercase">
+            <div className="grid grid-cols-[1fr_auto_auto] gap-x-3 px-3 text-[10px] tracking-wide text-neutral-400 uppercase">
               <span>Name</span>
-              <span className="text-center">Qty</span>
-              <span className="text-right">Price</span>
+              <span className="w-16 text-center">Qty</span>
+              <span className="w-16 text-right">Price</span>
             </div>
             
             {/* Scrollable Order List */}
@@ -770,31 +755,11 @@ export function PosClient({
                 cart.map((item) => (
                   <li
                     key={item.productId}
-                    className="grid grid-cols-[minmax(0,1fr)_5.25rem_4rem] items-center gap-x-2 border-b border-neutral-100 py-2 last:border-none"
+                    className="grid grid-cols-[1fr_auto_auto] items-center gap-x-3 border-b border-neutral-100 py-1.5 last:border-none"
                   >
                     <span className="min-w-0 truncate text-xs">{item.name}</span>
-                    <span className="mx-auto flex h-7 items-center overflow-hidden rounded-md border border-neutral-200 bg-neutral-50 text-xs">
-                      <button
-                        type="button"
-                        onClick={() => decreaseItem(item.productId)}
-                        aria-label={`Decrease ${item.name} quantity`}
-                        title="Decrease quantity"
-                        className="flex h-full w-7 items-center justify-center border-r border-neutral-200 text-sm text-neutral-500 transition hover:bg-neutral-200 hover:text-black"
-                      >
-                        −
-                      </button>
-                      <span className="w-7 text-center font-medium">{item.qty}</span>
-                      <button
-                        type="button"
-                        onClick={() => removeItem(item.productId)}
-                        aria-label={`Remove ${item.name} from checkout`}
-                        title="Remove item"
-                        className="flex h-full w-7 items-center justify-center border-l border-neutral-200 text-sm text-red-500 transition hover:bg-red-50 hover:text-red-700"
-                      >
-                        ×
-                      </button>
-                    </span>
-                    <span className="text-right text-xs">
+                    <span className="w-16 text-center text-xs">{item.qty}</span>
+                    <span className="w-16 text-right text-xs">
                       {formatMoney(item.price * item.qty)}
                     </span>
                   </li>
