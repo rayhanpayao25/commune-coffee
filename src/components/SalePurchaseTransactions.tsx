@@ -37,6 +37,57 @@ function ordersToTransactions(orders: Order[]): Transaction[] {
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id));
 }
 
+const iconBtn =
+  "inline-flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 transition-all hover:bg-neutral-100 hover:text-neutral-900";
+
+function PencilIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor">
+      <path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3Z" strokeWidth="1.7" strokeLinejoin="round" />
+      <path d="M13.5 6.5l3 3" strokeWidth="1.7" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor">
+      <path d="M5 7h14M10 7V5h4v2M8 7l1 12h6l1-12" strokeWidth="1.7" />
+    </svg>
+  );
+}
+
+function RowActions({
+  editLabel,
+  deleteLabel,
+  onEdit,
+  onDelete,
+  onDeleteMouseDown,
+}: {
+  editLabel: string;
+  deleteLabel: string;
+  onEdit: () => void;
+  onDelete: () => void;
+  onDeleteMouseDown?: (event: React.MouseEvent<HTMLButtonElement>) => void;
+}) {
+  return (
+    <div className="inline-flex items-center justify-center gap-0.5">
+      <button type="button" aria-label={editLabel} onClick={onEdit} className={iconBtn}>
+        <PencilIcon />
+      </button>
+      <button
+        type="button"
+        aria-label={deleteLabel}
+        onMouseDown={onDeleteMouseDown}
+        onClick={onDelete}
+        className={`${iconBtn} hover:bg-red-50 hover:text-red-600`}
+      >
+        <TrashIcon />
+      </button>
+    </div>
+  );
+}
+
 function transactionToOrder(transaction: Transaction, existing?: Order): Order {
   const createdAt = phIsoFromDate(transaction.date, existing?.createdAt);
   const sameItems =
@@ -795,9 +846,13 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                       <td className="p-3 border-r border-neutral-200 text-right">{t.quantity}</td>
                       <td className="p-3 border-r border-neutral-200 text-right">₱{t.price.toFixed(2)}</td>
                       <td className="p-3 border-r border-neutral-200 text-right font-semibold">₱{t.amount.toFixed(2)}</td>
-                      <td className="p-3 text-center space-x-2">
-                        <button onClick={() => handleEditTransaction(t)} className="text-black hover:underline font-medium text-xs">Edit</button>
-                        <button onClick={() => handleDeleteTransaction(t.id)} className="text-red-600 hover:underline font-medium text-xs">Delete</button>
+                      <td className="p-3 text-center">
+                        <RowActions
+                          editLabel={`Edit ${t.productName}`}
+                          deleteLabel={`Delete ${t.productName}`}
+                          onEdit={() => handleEditTransaction(t)}
+                          onDelete={() => void handleDeleteTransaction(t.id)}
+                        />
                       </td>
                     </tr>
                   ))
@@ -932,16 +987,14 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                           </button>
                         </div>
                       </td>
-                      <td className="p-3 text-center space-x-2">
-                        <button type="button" onClick={() => handleEditStock(s)} className="text-black hover:underline font-medium text-xs">Edit</button>
-                        <button
-                          type="button"
-                          onMouseDown={(event) => event.preventDefault()}
-                          onClick={() => void handleDeleteStock(s.id)}
-                          className="text-red-600 hover:underline font-medium text-xs"
-                        >
-                          Delete
-                        </button>
+                      <td className="p-3 text-center">
+                        <RowActions
+                          editLabel={`Edit ${s.name}`}
+                          deleteLabel={`Delete ${s.name}`}
+                          onEdit={() => handleEditStock(s)}
+                          onDelete={() => void handleDeleteStock(s.id)}
+                          onDeleteMouseDown={(event) => event.preventDefault()}
+                        />
                       </td>
                     </tr>
                   );
@@ -997,9 +1050,13 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                     <td className="p-3 border-r border-neutral-200 text-neutral-600">
                       {stocks.find((item) => namesMatch(item.name, r.itemName))?.unit || ""}
                     </td>
-                    <td className="p-3 text-center space-x-2">
-                      <button onClick={() => handleEditRestock(r)} className="text-black hover:underline font-medium text-xs">Edit</button>
-                      <button onClick={() => handleDeleteRestock(r.id)} className="text-red-600 hover:underline font-medium text-xs">Delete</button>
+                    <td className="p-3 text-center">
+                      <RowActions
+                        editLabel={`Edit restock ${r.itemName}`}
+                        deleteLabel={`Delete restock ${r.itemName}`}
+                        onEdit={() => handleEditRestock(r)}
+                        onDelete={() => void handleDeleteRestock(r.id)}
+                      />
                     </td>
                   </tr>
                                   ))
@@ -1048,7 +1105,14 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                       updated[idx].outputCups = Number(e.target.value);
                       setCostingIngs(updated);
                     }} className="w-full sm:w-28 bg-white border border-neutral-400 rounded px-3 py-1.5 text-sm" aria-label="Cups produced" />
-                    <button type="button" onClick={() => setCostingIngs(costingIngs.filter((_, i) => i !== idx))} className="text-red-600 text-xs px-2 py-1.5 text-left sm:text-center">Remove</button>
+                    <button
+                      type="button"
+                      aria-label="Remove ingredient"
+                      onClick={() => setCostingIngs(costingIngs.filter((_, i) => i !== idx))}
+                      className={`${iconBtn} hover:bg-red-50 hover:text-red-600`}
+                    >
+                      <TrashIcon />
+                    </button>
                   </div>
                 ))}
                 <button type="button" onClick={() => setCostingIngs([...costingIngs, { name: "", amount: 0, unit: "", outputCups: 0 }])} className="text-xs border border-neutral-300 bg-white text-black hover:bg-neutral-100 px-3 py-1 rounded">
@@ -1106,9 +1170,13 @@ export function SalePurchaseTransactions({ store }: { store: StoreData }) {
                       <td className="p-3 border-r border-neutral-200 text-right font-semibold">
                         {cupsLeft.toFixed(1)} cups
                       </td>
-                      <td className="p-3 text-center space-x-2">
-                        <button onClick={() => handleEditCosting(c)} className="text-black hover:underline font-medium text-xs">Edit</button>
-                        <button onClick={() => handleDeleteCosting(c.id)} className="text-red-600 hover:underline font-medium text-xs">Delete</button>
+                      <td className="p-3 text-center">
+                        <RowActions
+                          editLabel={`Edit costing ${c.productName}`}
+                          deleteLabel={`Delete costing ${c.productName}`}
+                          onEdit={() => handleEditCosting(c)}
+                          onDelete={() => void handleDeleteCosting(c.id)}
+                        />
                       </td>
                     </tr>
                   );
