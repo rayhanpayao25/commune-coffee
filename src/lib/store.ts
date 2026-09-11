@@ -13,6 +13,7 @@ import type {
 } from "@/lib/types";
 import { DEFAULT_MENU, MENU_CATEGORIES } from "@/lib/menu";
 import { parsePayment } from "@/lib/payments";
+import { DEFAULT_LOGIN_GATES, normalizeLoginGates } from "@/lib/staff-gates";
 import { DEFAULT_PROMOS } from "@/lib/promos";
 import { DEFAULT_USERS, normalizeStaffRole } from "@/lib/users";
 
@@ -155,6 +156,7 @@ function emptyStore(): StoreData {
     costings: structuredClone(DEFAULT_COSTINGS),
     loginActivity: [],
     offRequests: [],
+    loginGates: { ...DEFAULT_LOGIN_GATES },
   };
 }
 
@@ -236,6 +238,7 @@ function normalizeStore(store: StoreData): StoreData {
   if (!Array.isArray(store.offRequests)) {
     store.offRequests = [];
   }
+  store.loginGates = normalizeLoginGates(store.loginGates);
 
   const matchaInventory = store.inventory.find((item) => /matcha/i.test(item.name));
   const hasMatchaCosting = store.costings.some((costing) =>
@@ -329,11 +332,14 @@ async function readStore(): Promise<StoreData> {
   const originalCostings = Array.isArray(original.costings) ? original.costings : [];
   const originalInventory = Array.isArray(original.inventory) ? original.inventory : [];
   const originalUsers = Array.isArray(original.users) ? original.users : [];
+  const originalGates = original.loginGates;
   if (
     store.costings.length !== originalCostings.length ||
     store.inventory.length !== originalInventory.length ||
     store.users.length !== originalUsers.length ||
-    store.users.some((user) => originalUsers.find((item) => item.id === user.id)?.role !== user.role)
+    store.users.some((user) => originalUsers.find((item) => item.id === user.id)?.role !== user.role) ||
+    store.loginGates.admin !== originalGates?.admin ||
+    store.loginGates.cashier !== originalGates?.cashier
   ) {
     await writeStore(store);
   }

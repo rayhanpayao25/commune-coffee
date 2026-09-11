@@ -147,4 +147,8 @@ export type StoreData = {
   costings: CostingItem[];
   loginActivity: LoginActivity[];
   offRequests: OffRequest[];
+  loginGates: {
+    admin: string;
+    cashier: string;
+  };
 };

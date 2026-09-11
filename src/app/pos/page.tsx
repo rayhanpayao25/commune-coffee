@@ -6,7 +6,7 @@ import { getStore } from "@/lib/store";
 export default async function PosPage() {
   const session = await getSession();
   if (!session || (session.role !== "cashier" && session.role !== "manager")) {
-    redirect("/login");
+    redirect("/");
   }
 
   const store = await getStore();

@@ -72,5 +72,5 @@ export async function logout() {
   }
   const jar = await cookies();
   jar.delete(SESSION_COOKIE);
-  redirect("/login");
+  redirect("/");
 }

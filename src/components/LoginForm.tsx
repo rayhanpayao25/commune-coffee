@@ -1,58 +1,25 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
 import { login, type LoginState } from "@/actions/auth";
-
-const ROLES = [
-  {
-    id: "admin",
-    label: "Admin",
-    note: "Sales, staff, and inventory",
-  },
-  {
-    id: "cashier",
-    label: "Cashier",
-    note: "POS only",
-  },
-] as const;
 
 const initial: LoginState = {};
 
 const field =
   "w-full rounded-none border border-white/30 bg-transparent px-4 py-3 text-white outline-none focus:border-white";
 
-export function LoginForm() {
+export function LoginForm({ role }: { role: "admin" | "cashier" }) {
   const [state, action, pending] = useActionState(login, initial);
-  const [role, setRole] = useState<(typeof ROLES)[number]["id"]>("cashier");
-  const selected = ROLES.find((item) => item.id === role) ?? ROLES[1];
 
   return (
     <form action={action} className="w-full max-w-md space-y-6">
       <input type="hidden" name="role" value={role} />
-      <div className="grid grid-cols-2 gap-2">
-        {ROLES.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => setRole(item.id)}
-            className={`rounded-full border px-2 py-3 text-sm transition sm:px-4 ${
-              role === item.id
-                ? "border-white bg-white text-black"
-                : "border-white/40 text-white hover:border-white"
-            }`}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
-      <p className="text-center text-sm text-neutral-400">{selected.note}</p>
 
       <label className="block text-left text-sm">
         <span className="mb-2 block tracking-wide text-neutral-400 uppercase">
           Username
         </span>
         <input
-          key={role}
           name="username"
           autoComplete="username"
           autoFocus

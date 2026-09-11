@@ -8,11 +8,13 @@ import {
   deleteStaffUser,
   punchStaff,
   setOffRequestStatus,
+  updateLoginGates,
   updateStaffUser,
 } from "@/actions/users";
 import type { PublicStaffUser } from "@/lib/users";
 import { phDateString, phDateTimeLabel } from "@/lib/datetime";
 import type { LoginActivity, OffRequest, Session } from "@/lib/types";
+import type { LoginGates } from "@/lib/staff-gates";
 
 const field =
   "w-full rounded-xl border border-neutral-200 bg-white px-3.5 py-2.5 text-sm text-neutral-900 outline-none transition-all focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900";
@@ -22,9 +24,10 @@ type UserManagerProps = {
   session: Session;
   loginActivity: LoginActivity[];
   offRequests: OffRequest[];
+  loginGates: LoginGates;
 };
 
-type SubTab = "staff" | "inout" | "off";
+type SubTab = "staff" | "inout" | "off" | "gates";
 type StaffRole = "Admin" | "Barista" | "Manager" | "Cashier";
 
 type StaffSession = {
@@ -81,7 +84,7 @@ function pairLoginSessions(records: LoginActivity[]): StaffSession[] {
   });
 }
 
-export function UserManager({ users, session, loginActivity, offRequests }: UserManagerProps) {
+export function UserManager({ users, session, loginActivity, offRequests, loginGates }: UserManagerProps) {
   const [tab, setTab] = useState<SubTab>("staff");
   const [editingId, setEditingId] = useState<string | "new" | null>(null);
   const [name, setName] = useState("");
@@ -95,6 +98,8 @@ export function UserManager({ users, session, loginActivity, offRequests }: User
   const [offUserId, setOffUserId] = useState("");
   const [offDate, setOffDate] = useState(phDateString());
   const [offReason, setOffReason] = useState("");
+  const [adminGate, setAdminGate] = useState(loginGates.admin);
+  const [cashierGate, setCashierGate] = useState(loginGates.cashier);
 
   const editing = users.find((user) => user.id === editingId) ?? null;
   const floorStaff = users.filter((user) => user.role !== "admin");
@@ -147,6 +152,7 @@ export function UserManager({ users, session, loginActivity, offRequests }: User
             { id: "staff", label: "Staff" },
             { id: "inout", label: "In / Off" },
             { id: "off", label: "Request off" },
+            { id: "gates", label: "Login links" },
           ] as const
         ).map((entry) => (
           <button
@@ -545,6 +551,73 @@ export function UserManager({ users, session, loginActivity, offRequests }: User
                 </tbody>
               </table>
             </div>
+          </>
+        ) : null}
+
+        {tab === "gates" ? (
+          <>
+            <div>
+              <h1 className="text-xl font-semibold tracking-tight">Login links</h1>
+              <p className="mt-1 text-sm text-neutral-500">
+                Change these if a link is forgotten or needs to stay private. The old path stops working after you save.
+              </p>
+            </div>
+            <form
+              className="space-y-4 rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5"
+              onSubmit={(event) => {
+                event.preventDefault();
+                startTransition(async () => {
+                  const result = await updateLoginGates(adminGate, cashierGate);
+                  if (result && "error" in result && result.error) {
+                    setNotice(typeof result.error === "string" ? result.error : "Could not save.");
+                    return;
+                  }
+                  if (result && "admin" in result) {
+                    setAdminGate(result.admin);
+                    setCashierGate(result.cashier);
+                  }
+                  setNotice("Login links updated. Bookmark the new URLs.");
+                });
+              }}
+            >
+              <label className="block text-xs font-medium text-neutral-600">
+                <span className="mb-1.5 block">Admin path</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-neutral-400">/</span>
+                  <input
+                    value={adminGate}
+                    onChange={(event) => setAdminGate(event.target.value)}
+                    className={field}
+                    required
+                  />
+                </div>
+                <span className="mt-1.5 block text-xs font-normal text-neutral-400">
+                  Open: /{adminGate.trim() || "…"}
+                </span>
+              </label>
+              <label className="block text-xs font-medium text-neutral-600">
+                <span className="mb-1.5 block">Cashier path</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-neutral-400">/</span>
+                  <input
+                    value={cashierGate}
+                    onChange={(event) => setCashierGate(event.target.value)}
+                    className={field}
+                    required
+                  />
+                </div>
+                <span className="mt-1.5 block text-xs font-normal text-neutral-400">
+                  Open: /{cashierGate.trim() || "…"}
+                </span>
+              </label>
+              <button
+                type="submit"
+                disabled={pending}
+                className="rounded-full bg-black px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-40"
+              >
+                {pending ? "Saving..." : "Save links"}
+              </button>
+            </form>
           </>
         ) : null}
       </div>

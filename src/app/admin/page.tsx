@@ -8,7 +8,7 @@ import { publicUser } from "@/lib/users";
 export default async function AdminPage() {
   const session = await getSession();
   if (!session || session.role !== "admin") {
-    redirect("/login");
+    redirect("/");
   }
 
   const store = await getStore();

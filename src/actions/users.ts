@@ -15,6 +15,7 @@ import {
   staffUserId,
   toSession,
 } from "@/lib/users";
+import { sanitizeLoginGate } from "@/lib/staff-gates";
 import type { OffRequest, Role, StaffUser } from "@/lib/types";
 
 async function requireAdmin() {
@@ -28,7 +29,6 @@ async function requireAdmin() {
 function refresh() {
   revalidatePath("/admin");
   revalidatePath("/pos");
-  revalidatePath("/login");
 }
 
 function parseStaff(input: {
@@ -298,4 +298,27 @@ export async function deleteOffRequest(id: string) {
   });
   refresh();
   return { ok: true };
+}
+
+export async function updateLoginGates(adminPath: string, cashierPath: string) {
+  await requireAdmin();
+  const admin = sanitizeLoginGate(adminPath);
+  if (!admin.ok) return { error: admin.error };
+  const cashier = sanitizeLoginGate(cashierPath);
+  if (!cashier.ok) return { error: cashier.error };
+  if (admin.value === cashier.value) {
+    return { error: "Use different paths for admin and cashier." };
+  }
+
+  let previous = { admin: "", cashier: "" };
+  await updateStore((store) => {
+    previous = { ...store.loginGates };
+    store.loginGates = { admin: admin.value, cashier: cashier.value };
+  });
+  refresh();
+  if (previous.admin) revalidatePath(`/${previous.admin}`);
+  if (previous.cashier) revalidatePath(`/${previous.cashier}`);
+  revalidatePath(`/${admin.value}`);
+  revalidatePath(`/${cashier.value}`);
+  return { ok: true, admin: admin.value, cashier: cashier.value };
 }
