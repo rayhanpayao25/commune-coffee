@@ -168,7 +168,7 @@ export function UserManager({ users, session, loginActivity, offRequests, loginG
         {(
           [
             { id: "staff", label: "Staff" },
-            { id: "inout", label: "In / Off" },
+            { id: "inout", label: "In / Out" },
             { id: "off", label: "Request off" },
             { id: "gates", label: "Login links" },
           ] as const
@@ -366,7 +366,7 @@ export function UserManager({ users, session, loginActivity, offRequests, loginG
         {tab === "inout" ? (
           <>
             <div>
-              <h1 className="text-xl font-semibold tracking-tight">Staff in / off</h1>
+              <h1 className="text-xl font-semibold tracking-tight">Staff in / out</h1>
               <p className="mt-1 text-sm text-neutral-500">Clock in and out times for cashiers, managers, and baristas.</p>
             </div>
             <form
@@ -413,12 +413,12 @@ export function UserManager({ users, session, loginActivity, offRequests, loginG
                         setNotice(typeof result.error === "string" ? result.error : "Could not record.");
                         return;
                       }
-                      setNotice("Marked off.");
+                      setNotice("Marked out.");
                     })
                   }
                   className="rounded-full border border-neutral-300 px-4 py-2 text-sm font-medium hover:border-black disabled:opacity-40"
                 >
-                  Off
+                  Out
                 </button>
               </div>
             </form>
@@ -428,7 +428,7 @@ export function UserManager({ users, session, loginActivity, offRequests, loginG
                   <tr className="border-b border-neutral-200 text-xs font-medium tracking-wide text-neutral-400 uppercase">
                     <th className="px-4 py-3">Staff</th>
                     <th className="px-4 py-3">In</th>
-                    <th className="px-4 py-3">Off</th>
+                    <th className="px-4 py-3">Out</th>
                     <th className="px-4 py-3 text-right"> </th>
                   </tr>
                 </thead>
@@ -436,7 +436,7 @@ export function UserManager({ users, session, loginActivity, offRequests, loginG
                   {sessions.length === 0 ? (
                     <tr>
                       <td colSpan={4} className="px-4 py-8 text-center text-sm text-neutral-400">
-                        No in / off records yet.
+                        No in / out records yet.
                       </td>
                     </tr>
                   ) : (

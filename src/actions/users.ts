@@ -247,7 +247,7 @@ export async function updateStaffSessionTimes(input: {
   await requireAdmin();
 
   if (!input.loginId && !input.logoutId) {
-    return { error: "No in / off time was selected." };
+    return { error: "No in / out time was selected." };
   }
 
   const loginAt = input.loginId ? phIsoFromDateTimeInput(input.loginAt ?? "") : undefined;
