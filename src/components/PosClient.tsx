@@ -7,7 +7,7 @@ import { ReceiptPreview } from "@/components/ReceiptPreview";
 import { formatMoney } from "@/lib/menu";
 import { phDateString, phDateTimeLabel } from "@/lib/datetime";
 import { PAYMENT_METHODS, parsePayment, paymentLabel } from "@/lib/payments";
-import { nextTicketNo, type ReceiptTicket } from "@/lib/escpos";
+import { drinkReceipts, nextTicketNo, type ReceiptTicket } from "@/lib/escpos";
 import { useReceiptPrinter } from "@/lib/receipt-printer";
 import type {
   MenuItem,
@@ -309,7 +309,10 @@ export function PosClient({
     return {
       ticketNo: nextTicketNo(orders),
       barista: session.name,
-      items: cart,
+      items: cart.map((item) => ({
+        ...item,
+        category: menu.find((menuItem) => menuItem.id === item.productId)?.category,
+      })),
       subtotal,
       discount,
       promoLabel: promo?.label,
@@ -323,10 +326,19 @@ export function PosClient({
 
   function printTicket() {
     if (cart.length > 0) {
-      setPreviewTicket(currentTicket());
+      const ticket = currentTicket();
+      if (drinkReceipts(ticket).length === 0) {
+        setMessage("Add drinks before printing.");
+        return;
+      }
+      setPreviewTicket(ticket);
       return;
     }
     if (lastTicket) {
+      if (drinkReceipts(lastTicket).length === 0) {
+        setMessage("The last order has no drinks to print.");
+        return;
+      }
       setPreviewTicket(lastTicket);
       return;
     }
@@ -543,7 +555,7 @@ export function PosClient({
               startTransition(async () => {
                 try {
                   await sendSlips(previewTicket);
-                  setMessage("Customer and cashier copies sent.");
+                  setMessage("Drink receipts sent.");
                   setPreviewTicket(null);
                 } catch (error) {
                   setMessage(
@@ -993,17 +1005,24 @@ export function PosClient({
                     setPaymentMethod("cash");
                     setPromoId(null);
                     setPromoOpen(false);
-                    if (printer.connected) {
+                    const receiptCount = drinkReceipts(saved).length;
+                    if (printer.connected && receiptCount > 0) {
                       try {
                         await printer.print(saved);
                         setMessage(
-                          `Paid ${formatMoney(result.total ?? 0)} · printed · tap Print to reprint`,
+                          `Paid ${formatMoney(result.total ?? 0)} · ${receiptCount} ${receiptCount === 1 ? "receipt" : "receipts"} printed · tap Print to reprint`,
                         );
                       } catch {
                         setMessage(
                           `Paid ${formatMoney(result.total ?? 0)} · printer failed · tap Print`,
                         );
                       }
+                      return;
+                    }
+                    if (receiptCount === 0) {
+                      setMessage(
+                        `Paid ${formatMoney(result.total ?? 0)} · no drinks to print`,
+                      );
                       return;
                     }
                     setMessage(
