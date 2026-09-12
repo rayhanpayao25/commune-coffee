@@ -230,7 +230,9 @@ export function salesByHour(orders: Order[], now = new Date(), days = 7) {
 }
 
 export function cafeHours(buckets: ReturnType<typeof salesByHour>) {
-  return buckets.filter((slot) => slot.hour >= 11 && slot.hour <= 23);
+  const open = buckets.filter((slot) => slot.hour >= 10 && slot.hour <= 23);
+  const midnight = buckets.find((slot) => slot.hour === 0);
+  return midnight ? [...open, midnight] : open;
 }
 
 export function changePercent(current: number, previous: number): number | null {
