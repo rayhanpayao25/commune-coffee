@@ -30,6 +30,7 @@ type PosClientProps = {
 
 const CASH_PRESETS = [500, 1000, 2000];
 const CHECKOUT_KEY = "commune_pos_checkout";
+const TEST_PRINTER_ENABLED = process.env.NEXT_PUBLIC_TEST_PRINTER === "true";
 
 type SavedCheckout = {
   userId: string;
@@ -356,7 +357,7 @@ export function PosClient({
   }
 
   return (
-    <div className="relative flex h-svh flex-col overflow-hidden bg-neutral-100 text-black">
+    <div className="pos-root relative flex h-svh flex-col overflow-hidden bg-neutral-100 text-black">
       <div className="pos-screen flex min-h-0 flex-1 flex-col overflow-hidden">
         <header className="flex h-12 shrink-0 items-center justify-between bg-black px-4 text-white">
           <div className="flex min-w-0 items-center gap-3">
@@ -549,6 +550,7 @@ export function PosClient({
             ticket={previewTicket}
             paperWidth={printer.paperWidth}
             printerReady={printer.connected}
+            testPrinterEnabled={TEST_PRINTER_ENABLED}
             pending={pending}
             onClose={() => setPreviewTicket(null)}
             onPrint={() =>
